@@ -296,8 +296,8 @@ function closeTxt(s){return "Close call at "+(s.from||"?")+": this buy only save
 function noteHtml(s){return s?'<div class="dnote"><i class="dot" style="background:'+LCOL[s.lvl]+'" title="'+s.lvl+'"></i>'+esc(noteTxt(s))+'</div>':""}
 function tierTxt(x,l){var f=l&&l.fbo;if(!f||!f.name)return"";var t=l.tiers?l.tiers[Math.max(0,x.ti)]:null;return f.name+(t?", "+pbTierLab(t[0])+" gal tier $"+x.tp.toFixed(2):" $"+x.tp.toFixed(2))}
 function pbLine(x,l,html){var sl=S.legs[l.i]||{},pb=sl.pb;if(!pb||!l.fbo||!l.fbo.name)return"";var ex=pb.d&&pb.d<pbToday(),t=tierTxt(x,l);
- if(!html)return "Contract: "+t+" ("+pb.v+(pb.d?", price date "+pbDTxt(pb.d)+(ex?" EXPIRED":""):"")+")"+(pb.fe&&pb.fe.length?" · per-flight fees not included: "+pbFeeTxt(pb.fe):"");
- return '<div class="pbl">'+esc(t)+' <span class="lbu">· '+esc(pb.v)+'</span>'+(ex?' <span class="tg exp">expired '+pbDTxt(pb.d,1)+'</span>':'')+'</div>'}
+ if(!html)return "Contract: "+t+" ("+pb.v+(pb.d?", price date "+pbDTxt(pb.d)+(ex?" EXPIRED":""):"")+(pb.r?", received "+pbDTxt(pb.r)+(pbStale(pb)?" — older than "+(pb.sd||14)+" days":""):"")+")"+(pb.info&&pb.info.posted!=null?" · "+pbInfoTxt(pb.info):"")+(pb.fe&&pb.fe.length?" · per-flight fees not included: "+pbFeeTxt(pb.fe):"");
+ return '<div class="pbl">'+esc(t)+' <span class="lbu">· '+esc(pb.v)+'</span>'+(ex?' <span class="tg exp">expired '+pbDTxt(pb.d,1)+'</span>':'')+(pbStale(pb)?' <span class="tg exp">older than '+(pb.sd||14)+' days</span>':'')+'</div>'}
 function closeCard(sv){if(!sv||!sv.close.length)return"";return '<div class="card warn close">'+sv.close.map(function(s){return '<div>⚠️ '+esc(closeTxt(s))+'</div>'}).join("")+'</div>'}
 function sensText(sv){if(!sv||!sv.close.length)return[];var L=["CLOSE CALLS"];sv.close.forEach(function(s){L.push("• "+closeTxt(s))});return L}
 
@@ -475,7 +475,10 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
 /* ---- Contract price book: vendor CSV import, stored on this device only (IndexedDB) ---- */
 var PB={vendors:[],idx:{},last:null,pending:null,busy:false},PB_TODAY=null,MON="JanFebMarAprMayJunJulAugSepOctNovDec";
 var PB_FIELDS=[["ignore","Ignore"],["code","Airport"],["country","Country"],["fbo","FBO"],["min","Tier min gal"],["price","Price"],["product","Product"],["date","Date"],["notes","Notes"]];
-var PB_BUILTIN=[{id:"worldfuel",name:"World Fuel",builtin:true,header:false,codeType:"auto",cols:{code:0,country:1,fbo:2,min:3,price:4,notes:5,date:7},ncol:8}];
+var PB_BUILTIN=[{id:"worldfuel",name:"World Fuel",src:"World Fuel",builtin:true,header:false,codeType:"auto",cols:{code:0,country:1,fbo:2,min:3,price:4,notes:5,date:7},ncol:8},
+ // Atlantic Aviation direct: header row, one JETA price per airport, no FBO/tier/date columns; CustomerOTDPrice is the contract price
+ {id:"atlantic",name:"Atlantic Aviation",src:"Atlantic direct",builtin:true,header:true,codeType:"auto",country:"United States",fbo:"Atlantic Aviation",received:true,staleDays:14,
+  cols:{code:"Airportcode",product:"Product",price:"CustomerOTDPrice"},info:{posted:"PostedOTDPrice",discount:"Discount"}}];
 function p2(n){return (n<10?"0":"")+n}
 function pbToday(){if(PB_TODAY)return PB_TODAY;var d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())}
 function pbDate(s){s=String(s||"").trim();var m=s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2}|\d{4})$/),y;
@@ -492,38 +495,42 @@ function pbNum(s){return parseFloat(String(s==null?"":s).replace(/[$,\s]/g,""))}
 function pbFboName(s){s=String(s||"").trim();var n=s.indexOf("-A/")>=0?s.split("-A/")[0]:s.split("/")[0];n=n.trim()||s;
  return n.toLowerCase().replace(/(^|[\s\-\/&(.])([a-z])/g,function(a,b,c){return b+c.toUpperCase()}).replace(/\b([A-Za-z]{2,4})\b/g,function(w){return /^(fbo|fbos|llc|usa|uae|uk|ksa|faa|sa|ltd)$/i.test(w)?(w.toLowerCase()==="ltd"?"Ltd":w.toUpperCase()):(/[aeiouy]/i.test(w)||w.length>3?w:w.toUpperCase())})}
 function pbProduct(notes){var m=String(notes||"").match(/Price for fuel item:\s*([^*]+?)\s*\*\*/i);return m?m[1].trim().toUpperCase():"JET FUEL"}
+function pbProdNorm(p){p=String(p||"").trim().toUpperCase();return /^(JET ?A|JET-A|JETA|JET ?A-?1|JET A1|JETA1)$/.test(p)?"JET FUEL":(p||"JET FUEL")}
+function pbStale(o){if(!o||!o.r)return false;var a=new Date(o.r+"T00:00:00"),b=new Date(pbToday()+"T00:00:00");return (b-a)/864e5>(o.sd||14)}
+function pbInfoTxt(i){if(!i||i.posted==null)return"";var d=i.discount;return "Posted $"+i.posted.toFixed(2)+(d==null?"":d>=0?" − discount $"+d.toFixed(2):" + $"+Math.abs(d).toFixed(2)+" (negative discount)")}
 function pbFees(notes){var out=[];String(notes||"").replace(/\*\*([\s\S]*?)\*\*/g,function(a,b){if(!/per\s*flight/i.test(b))return;b.replace(/([A-Z][A-Z \-]*?FEE)\s*:\s*([\d.,]+)/g,function(x,k,v){var lb=k.trim().toLowerCase();out.push([lb.charAt(0).toUpperCase()+lb.slice(1),pbNum(v)])})});return out}
 function pbFeeTxt(fe){return (fe||[]).map(function(f){return f[0]+" $"+(f[1]%1?f[1].toFixed(2):f[1])}).join(" · ")}
 var US_ICAO=/^(K|PA|PH|PG|PW|TJ|TI)/;
 function pbIsUS(c){return /united states|^usa?$|^u\.s\.|puerto rico|guam|virgin islands.*u\.?s/i.test(String(c||"").trim())}
-function pbResolve(code,country,type){code=String(code||"").replace(/\s+/g,"").toUpperCase();if(!/^[A-Z0-9]{3,4}$/.test(code))return null;var A=aptIdx();
+function pbResolve(code,country,type,soft){code=String(code||"").replace(/\s+/g,"").toUpperCase();if(!/^[A-Z0-9]{3,4}$/.test(code))return null;var A=aptIdx();
  if(code.length===4)return type!=="IATA"&&A[code]?code:null;
  if(type==="ICAO")return null;var q=iataIdx()[code]||null,k=A["K"+code]?"K"+code:null;
- if(country){if(pbIsUS(country)){if(q&&US_ICAO.test(q))return q;return k||null}   // US row → US airport (IATA if US, else FAA K-code)
+ if(country){if(pbIsUS(country)){if(q&&US_ICAO.test(q))return q;return k||(soft?q:null)}   // soft = profile default country: US first, then any IATA match   // US row → US airport (IATA if US, else FAA K-code)
   return q&&!US_ICAO.test(q)?q:null}                                               // non-US row → foreign airport only
  return q||k}
 function pbProfiles(){return PB_BUILTIN.concat(S.pbProfiles||[])}
 function pbDetect(rows){var s=rows.slice(0,30).filter(function(r){return r.length>1});if(!s.length)return null;
  return pbProfiles().filter(function(p){var c=p.cols,b=p.header?s.slice(1):s;if(p.header){var h=s[0].map(function(x){return String(x).trim().toLowerCase()});return Object.keys(c).every(function(k){return typeof c[k]!=="string"||h.indexOf(c[k].toLowerCase())>=0})&&b.length>0}
   var good=b.filter(function(r){return (!p.ncol||r.length===p.ncol)&&isFinite(pbNum(r[c.price]))&&(c.min==null||isFinite(pbNum(r[c.min])))&&(c.date==null||!!pbDate(r[c.date]))}).length;return (!p.ncol||b.every(function(r){return r.length===p.ncol}))&&good>=Math.max(1,Math.ceil(b.length*0.8))})[0]||null}
-function pbBuild(rows,prof){var c=prof.cols,hdr=null,st=0,ci={},k;
+function pbBuild(rows,prof,opt){opt=opt||{};var c=prof.cols,hdr=null,st=0,ci={},k,ii={},rcv=prof.received?(opt.received||pbToday()):null;
  if(prof.header){hdr=(rows[0]||[]).map(function(x){return String(x).trim().toLowerCase()});st=1}
- for(k in c)ci[k]=typeof c[k]==="number"?c[k]:(hdr?hdr.indexOf(String(c[k]).trim().toLowerCase()):-1);
+ var col=function(v){return typeof v==="number"?v:(hdr?hdr.indexOf(String(v).trim().toLowerCase()):-1)};for(k in c)ci[k]=col(c[k]);for(k in (prof.info||{}))ii[k]=col(prof.info[k]);
  var g=function(r,f){var j=ci[f];return j!=null&&j>=0&&r[j]!=null?String(r[j]).trim():""},hasC=ci.country!=null&&ci.country>=0;
  var off={},sum={rows:0,imported:0,cfp:0,bad:0,unknown:0,unk:{},expired:0,additive:0},td=pbToday();
  for(var i=st;i<rows.length;i++){var r=rows[i];if(!r||r.length<2)continue;sum.rows++;
   var pr=pbNum(g(r,"price"));if(pr>=9999){sum.cfp++;continue}if(!(pr>0&&pr<100)){sum.bad++;continue}
-  var code=g(r,"code").toUpperCase(),ic=pbResolve(code,hasC?g(r,"country")||"?":null,prof.codeType);
+  var code=g(r,"code").toUpperCase(),ic=pbResolve(code,hasC?g(r,"country")||"?":(prof.country||null),prof.codeType,!hasC&&!!prof.country);
   if(!ic){sum.unknown++;sum.unk[code||"(blank)"]=(sum.unk[code||"(blank)"]||0)+1;continue}
-  var notes=g(r,"notes"),prod=(g(r,"product")||pbProduct(notes)).toUpperCase(),add=/ADDITIVE/.test(prod),fb=pbFboName(g(r,"fbo"))||"(FBO not given)",mn=pbNum(g(r,"min")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
-  if(!(mn>=0))mn=0;if(!o){o=off[key]={a:ic,c:code,f:fb,p:prod,x:add,d:d,t:[],fe:pbFees(notes)}}
+  var notes=g(r,"notes"),prod=pbProdNorm(g(r,"product")||pbProduct(notes)),add=/ADDITIVE/.test(prod),fb=prof.fbo||pbFboName(g(r,"fbo"))||"(FBO not given)",mn=pbNum(g(r,"min")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
+  if(!(mn>=0))mn=0;if(!o){o=off[key]={a:ic,c:code,f:fb,p:prod,x:add,d:prof.received?null:d,t:[],fe:pbFees(notes)};if(rcv){o.r=rcv;o.sd=prof.staleDays||14}
+   var inf={},hi=false;for(var q in ii)if(ii[q]>=0&&r[ii[q]]!=null&&String(r[ii[q]]).trim()!==""){inf[q]=pbNum(r[ii[q]]);hi=true}if(hi)o.info=inf}
   var dup=o.t.filter(function(t){return t[0]===mn})[0];if(dup)dup[1]=Math.min(dup[1],pr);else o.t.push([mn,pr]);
-  if(d&&(!o.d||d<o.d))o.d=d;sum.imported++;if(d&&d<td)sum.expired++;if(add)sum.additive++}
+  if(!prof.received&&d&&(!o.d||d<o.d))o.d=d;sum.imported++;if(!prof.received&&d&&d<td)sum.expired++;if(add)sum.additive++}
  var list=Object.keys(off).map(function(k){var o=off[k];o.t.sort(function(a,b){return a[0]-b[0]});return o}),ap={};
  list.forEach(function(o){ap[o.a]=1});sum.airports=Object.keys(ap).length;sum.offers=list.length;
  var fb={};list.forEach(function(o){fb[o.a+"|"+o.f]=1});sum.fbos=Object.keys(fb).length;
- sum.expOffers=list.filter(function(o){return o.d&&o.d<td}).length;
- return{id:prof.id,name:prof.name,profile:prof.id,imported:new Date().toISOString(),sum:sum,offers:list}}
+ sum.expOffers=list.filter(function(o){return o.d&&o.d<td}).length;sum.resolved={};list.forEach(function(o){sum.resolved[o.c]=o.a});
+ return{id:prof.id,name:prof.name,src:prof.src||prof.name,received:rcv,profile:prof.id,imported:new Date().toISOString(),sum:sum,offers:list}}
 /* storage: IndexedDB (a full vendor book is several MB — too big for localStorage); in-memory fallback */
 function pbDb(cb){var I=typeof indexedDB!=="undefined"?indexedDB:null;if(!I){cb(null);return}
  try{var q=I.open("tankering-pricebook",1);q.onupgradeneeded=function(){q.result.createObjectStore("vendors",{keyPath:"id"})};q.onsuccess=function(){cb(q.result)};q.onerror=function(){cb(null)}}catch(e){cb(null)}}
@@ -538,8 +545,8 @@ function pbKey(e){return e.v.id+"|"+e.o.f+"|"+e.o.p}
 function pbOffers(icao){return (PB.idx[icao]||[]).filter(function(e){return S.useAdd||!e.o.x}).slice().sort(function(a,b){return a.o.t[0][1]-b.o.t[0][1]})}
 function pbBest(t){var b=t[0];t.forEach(function(x){if(x[1]<b[1])b=x});return b}
 function pbTierLab(m){return gal(Math.max(1,Math.ceil(m-1e-9)))+"+"}
-function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return o.f+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(multi?" · "+e.v.name:"")+(o.d&&o.d<pbToday()?" · expired":"")}
-function pbSnap(e){return{k:pbKey(e),v:e.v.name,vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,t:e.o.t.map(function(t){return[t[0],t[1]]}),fe:e.o.fe}}
+function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return o.f+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(multi?" ("+(e.v.src||e.v.name)+")":"")+(o.d&&o.d<pbToday()?" · expired":"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
+function pbSnap(e){return{k:pbKey(e),v:e.v.src||e.v.name,vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,t:e.o.t.map(function(t){return[t[0],t[1]]}),fe:e.o.fe}}
 function pbPick(i,key){var l=S.legs[i];if(!l)return;if(!key||key==="manual"){delete l.pb;return}
  var e=pbOffers(l.from).concat(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===key})[0];if(!e)return;l.pb=pbSnap(e);l.price=l.pb.t[0][1];
  var m=(S.fboMem||{})[l.from+"|"+e.o.f];if(m){l.fee=m.fee;l.waiver=m.waiver}}
@@ -550,7 +557,7 @@ function pbLegHtml(l,i){var of=pbOffers(l.from),cur=l.pb;if(!of.length&&!cur)ret
  var h='<div class="pbleg"><label>Contract FBO at '+esc(l.from)+' <span class="info" title="'+esc(TIER_TIP)+'">ⓘ</span></label><select data-pb="'+i+'"><option value="manual">Manual price</option>';
  var has=false;of.forEach(function(e){var k=pbKey(e);if(cur&&cur.k===k)has=true;h+='<option value="'+esc(k)+'"'+(cur&&cur.k===k?' selected':'')+'>'+esc(pbOptLab(e,multi))+'</option>'});
  if(cur&&!has)h+='<option value="'+esc(cur.k)+'" selected>'+esc(cur.f+" (saved)")+'</option>';h+='</select>';
- if(cur){h+='<div class="hint">'+esc(cur.v)+(cur.d?' · price date '+pbDTxt(cur.d):'')+(ex?' <span class="tg exp">expired '+pbDTxt(cur.d,1)+'</span>':'')+'<br>Tiers: '+cur.t.map(function(t){return pbTierLab(t[0])+' $'+t[1].toFixed(2)}).join(' · ')+'</div>'+(cur.fe&&cur.fe.length?'<div class="hint">ⓘ Per-flight fees (not included): '+esc(pbFeeTxt(cur.fe))+'</div>':'')}
+ if(cur){h+='<div class="hint">'+esc(cur.v)+(cur.d?' · price date '+pbDTxt(cur.d):'')+(cur.r?' · received '+pbDTxt(cur.r):'')+(ex?' <span class="tg exp">expired '+pbDTxt(cur.d,1)+'</span>':'')+(pbStale(cur)?' <span class="tg exp">older than '+(cur.sd||14)+' days</span>':'')+'<br>'+(cur.t.length>1?'Tiers: '+cur.t.map(function(t){return pbTierLab(t[0])+' $'+t[1].toFixed(2)}).join(' · '):'Contract $'+cur.t[0][1].toFixed(2)+'/gal (one price)')+(cur.info&&cur.info.posted!=null?' · '+esc(pbInfoTxt(cur.info)):'')+'</div>'+(cur.fe&&cur.fe.length?'<div class="hint">ⓘ Per-flight fees (not included): '+esc(pbFeeTxt(cur.fe))+'</div>':'')}
  else h+='<div class="hint">'+of.length+' contract price'+(of.length>1?'s':'')+' on file — pick one to fill the price.</div>';
  return h+'</div>'}
 function pbSumHtml(s,name){var u=Object.keys(s.unk||{}).sort();return '<div class="pbsum"><b>Imported '+esc(name)+'</b><div class="kv">'+
@@ -566,7 +573,7 @@ function pbMapHtml(){var P=PB.pending,n=P.ncol,h='<div class="pbmap"><b>New file
 function pbSection(){var nA=Object.keys(PB.idx).length,h='<h2><button class="sethd" id="pbtog" aria-expanded="'+(S.pbOpen?'true':'false')+'">'+(S.pbOpen?'▾':'▸')+' Contract prices'+(nA?' <span class="cnt">'+gal(nA)+' airports</span>':'')+'</button></h2>';
  if(!S.pbOpen)return h;h+='<div class="card pbc">';
  if(!PB.vendors.length)h+='<p class="muted" style="margin-top:0">No contract prices yet. Import your vendor’s CSV (e.g. the weekly World Fuel price file) to pick FBOs and tier prices on each leg.</p>';
- PB.vendors.forEach(function(v){var s=v.sum;h+='<div class="pbv"><div><b>'+esc(v.name)+'</b><div class="sm">Imported '+pbDTxt(v.imported.slice(0,10))+' · '+gal(s.imported)+' prices · '+gal(s.airports)+' airports · '+gal(s.fbos)+' FBOs'+(s.expOffers?' · <span class="tg exp">'+gal(s.expOffers)+' expired</span>':'')+'</div></div><button class="btn del" data-pbdel="'+esc(v.id)+'">Remove</button></div>'});
+ PB.vendors.forEach(function(v){var s=v.sum;h+='<div class="pbv"><div><b>'+esc(v.name)+'</b><div class="sm">'+(v.src&&v.src!==v.name?esc(v.src)+' · ':'')+'Imported '+pbDTxt(v.imported.slice(0,10))+(v.received?' · received '+pbDTxt(v.received):'')+' · '+gal(s.imported)+' prices · '+gal(s.airports)+' airports · '+gal(s.fbos)+' FBOs'+(s.expOffers?' · <span class="tg exp">'+gal(s.expOffers)+' expired</span>':'')+'</div></div><button class="btn del" data-pbdel="'+esc(v.id)+'">Remove</button></div>'});
  h+=ghHtml();h+='<p class="sm" style="margin:12px 0 4px"><b>Or import a CSV file</b></p>';h+='<button class="btn full" id="pbimp"'+(PB.busy?' disabled':'')+'>'+(PB.busy?'⏳ Importing…':'⇪ Import CSV')+'</button><input type="file" id="pbfile" accept=".csv,text/csv,text/plain" style="display:none">';
  h+='<p class="muted">Re-importing a vendor’s file replaces its old prices. Prices are stored on this device only and are never uploaded. <span class="info" title="'+esc(TIER_TIP)+'">ⓘ How tiers are priced</span></p>';
  h+='<div class="tog"><span>Use additive prices (JETA-ADDITIVE)</span><label class="sw"><input type="checkbox" id="useadd"'+(S.useAdd?' checked':'')+'><span></span></label></div>';
@@ -589,7 +596,7 @@ function ghCfg(){var g=S.gh=S.gh||{};if(!g.repo)g.repo="adibiase/fuel-prices";if
 function ghOnline(){return !(typeof navigator!=="undefined"&&navigator&&navigator.onLine===false)}
 function ghFetch(path,accept,cb){var g=ghCfg(),off={off:true,msg:"Offline or GitHub unreachable — using the prices saved on this device."};
  if(typeof fetch!=="function"||!ghOnline()){cb(off);return}
- var sep=path.indexOf("?")>=0?"&":"?",url=GH_API+g.repo.replace(/^\/+|\/+$/g,"")+"/"+path+(/^git\//.test(path)?"":sep+"ref="+encodeURIComponent(g.branch));
+ var sep=path.indexOf("?")>=0?"&":"?",url=GH_API+g.repo.replace(/^\/+|\/+$/g,"")+"/"+path+(/^(git\/|commits)/.test(path)?"":sep+"ref="+encodeURIComponent(g.branch));
  fetch(url,{headers:{"Authorization":"Bearer "+ghTok(),"Accept":accept,"X-GitHub-Api-Version":"2022-11-28"},cache:"no-store"}).then(function(r){
   if(r.ok)return(/raw/.test(accept)?r.text():r.json()).then(function(d){cb(null,d)});
   var H=function(k){return r.headers&&r.headers.get?r.headers.get(k):null},rem=H("x-ratelimit-remaining"),rs=+H("x-ratelimit-reset");
@@ -613,15 +620,17 @@ function ghSync(force,cb){var g=ghCfg();if(!ghTok()){g.err="Paste a GitHub token
     if(!ent){gv.err="no latest.csv in "+f+"/";log.push(f+": no latest.csv");next();return}
     var have=PB.vendors.filter(function(v){return v.src&&v.src.path===f+"/"+ent.name&&v.src.sha===ent.sha})[0];
     if(!force&&have&&gv.sha===ent.sha){gv.checked=Date.now();gv.err=null;log.push(f+": unchanged");next();return}   // sha unchanged → skip download
-    var done=function(text){var rows=csvParse(text),p=pbDetect(rows)||pbProfiles().filter(function(x){return x.id===gv.profile})[0];
-     if(!p){PB.pending={rows:rows.slice(0,6),all:rows,ncol:Math.max.apply(null,rows.slice(0,30).map(function(r){return r.length}).concat([0])),file:"GitHub "+f+"/latest.csv",map:{},header:false,codeType:"auto",name:f,gh:{f:f,sha:ent.sha}};gv.err="layout not recognised — map the columns below";log.push(f+": needs column mapping");next();return}
-     var v=pbBuild(rows,p);v.file=f+"/latest.csv";v.src={gh:g.repo,branch:g.branch,path:f+"/"+ent.name,sha:ent.sha,at:Date.now()};pbPut(v);PB.last=v;
-     gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.profile=p.id;gv.name=p.name;gv.err=null;g.err=null;log.push(f+": updated");next()};
-    // raw media type works for files up to 100 MB (the JSON form returns no content above 1 MB); fall back to the git blob by sha
-    ghFetch("contents/"+encodeURIComponent(f)+"/"+encodeURIComponent(ent.name),"application/vnd.github.raw",function(e,t){
+    var dl=function(){ghFetch("contents/"+encodeURIComponent(f)+"/"+encodeURIComponent(ent.name),"application/vnd.github.raw",function(e,t){
      if(!e&&t&&t.length)return done(t);
      if(e&&(e.status===401||e.off)){g.err=e.msg;log.push(f+": "+e.msg);next();return}
-     ghFetch("git/blobs/"+ent.sha,"application/vnd.github.raw",function(e2,t2){if(e2||!t2){g.err=(e2||{}).msg||"Download failed.";log.push(f+": download failed");next();return}done(t2)})})})})()})}
+     ghFetch("git/blobs/"+ent.sha,"application/vnd.github.raw",function(e2,t2){if(e2||!t2){g.err=(e2||{}).msg||"Download failed.";log.push(f+": download failed");next();return}done(t2)})})};
+    var done=function(text){var rows=csvParse(text),p=pbDetect(rows)||pbProfiles().filter(function(x){return x.id===gv.profile})[0];
+     if(!p){PB.pending={rows:rows.slice(0,6),all:rows,ncol:Math.max.apply(null,rows.slice(0,30).map(function(r){return r.length}).concat([0])),file:"GitHub "+f+"/latest.csv",map:{},header:false,codeType:"auto",name:f,gh:{f:f,sha:ent.sha}};gv.err="layout not recognised — map the columns below";log.push(f+": needs column mapping");next();return}
+     var v=pbBuild(rows,p,{received:gv.cdate||null});v.file=f+"/latest.csv";v.src={gh:g.repo,branch:g.branch,path:f+"/"+ent.name,sha:ent.sha,at:Date.now()};pbPut(v);PB.last=v;
+     gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.profile=p.id;gv.name=p.name;gv.err=null;g.err=null;log.push(f+": updated");next()};
+    // raw media type works for files up to 100 MB (the JSON form returns no content above 1 MB); fall back to the git blob by sha.
+    // The file's last commit date is its "received" date (for vendor files without a price date); failure is not fatal.
+    gv.cdate=null;ghFetch("commits?path="+encodeURIComponent(f+"/"+ent.name)+"&sha="+encodeURIComponent(g.branch)+"&per_page=1","application/vnd.github+json",function(e,c){var dt=!e&&Array.isArray(c)&&c[0]&&c[0].commit&&(c[0].commit.committer||c[0].commit.author||{}).date;if(dt){var D=new Date(dt);gv.cdate=D.getFullYear()+"-"+p2(D.getMonth()+1)+"-"+p2(D.getDate())}dl()})})})()})}
 function ghAuto(){var g=ghCfg();if(!ghTok()||!ghOnline()||g.busy)return;if(g.lastCheck&&Date.now()-g.lastCheck<GH_EVERY)return;ghSync(false,function(){render();save()})}
 function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from GitHub</b> <span class="lsub">private repo</span>';
  Object.keys(g.v).forEach(function(f){var v=g.v[f];if(v.sha&&v.on)h+='<div class="ghst">✓ Prices from GitHub · '+esc(v.name||f)+' · updated '+ghWhen(v.at)+' · sha '+esc(v.sha.slice(0,7))+(v.checked&&v.checked>v.at?' <span class="lbu">(checked '+ghWhen(v.checked)+')</span>':'')+'</div>'});
