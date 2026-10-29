@@ -562,9 +562,9 @@ function pbBuild(rows,prof,opt){opt=opt||{};var c=prof.cols,hdr=null,st=0,ci={},
   if(!ic&&ci.iata>=0&&g(r,"iata")){var c2=g(r,"iata").toUpperCase();ic=pbResolve(c2,cty,"auto");if(!code)code=c2}
   if(!ic&&ci.faa>=0&&g(r,"faa")){var c3=g(r,"faa").toUpperCase();ic=pbResolve(c3,cty,"auto");if(!code)code=c3}
   if(!ic){if(tierSrc!=null&&(rows[i-1]||[])[tierSrc]===r[tierSrc])continue;sum.unknown++;sum.unk[code||"(blank)"]=(sum.unk[code||"(blank)"]||0)+1;continue}
-  var notes=g(r,"notes"),prod=pbProdNorm(g(r,"product")||pbProduct(notes)),add=/ADDITIVE/.test(prod),fraw=g(r,"fbo"),fb=prof.fbo?(/^[A-Z0-9]{4}$/.test(sfx.split(" ")[0])?"Signature "+sfx:prof.fbo+sfx):(prof.stripFbo?fraw.replace(prof.stripFbo,"").trim()||fraw:pbFboName(fraw))||"(FBO not given)",mn=pbNum(g(r,"min")),mx=pbNum(g(r,"max"));if(mx>=99999)mx=0;var ef=pbDate(g(r,"eff")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
+  var notes=g(r,"notes"),prod=pbProdNorm(g(r,"product")||pbProduct(notes)),add=/ADDITIVE/.test(prod),fraw=g(r,"fbo"),fb=prof.fbo?(/^[A-Z0-9]{4}$/.test(sfx.split(" ")[0])?sigBaseFbo(sfx.split(" ")[0])+sfx.slice(sfx.split(" ")[0].length):prof.fbo+sfx):(prof.stripFbo?fraw.replace(prof.stripFbo,"").trim()||fraw:pbFboName(fraw))||"(FBO not given)",mn=pbNum(g(r,"min")),mx=pbNum(g(r,"max"));if(mx>=99999)mx=0;var ef=pbDate(g(r,"eff")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
   if(!(mn>=0))mn=0;if(lit){mn/=L_PER_GAL;if(mx>0)mx/=L_PER_GAL}
-  if(!o){o=off[key]={a:ic,c:code,f:fb,p:prod,x:add,d:prof.received?null:d,t:[],fe:pbFees(notes)};if(prof.stripFbo&&fraw!==fb)o.fn=fraw;if(prof.direct){o.dir=1;if(notes)o.note=notes}if(rcv){o.r=rcv;o.sd=prof.staleDays||14}
+  if(!o){o=off[key]={a:ic,c:code,f:fb,p:prod,x:add,d:prof.received?null:d,t:[],fe:pbFees(notes)};if(prof.stripFbo&&fraw!==fb)o.fn=fraw;if(prof.direct){o.dir=1;if(notes)o.note=notes}if(prof.baseSuffix)o.sb=code;if(rcv){o.r=rcv;o.sd=prof.staleDays||14}
    var inf={},hi=false;for(var q in ii)if(ii[q]>=0&&r[ii[q]]!=null&&String(r[ii[q]]).trim()!==""){inf[q]=pbNum(r[ii[q]]);hi=true}if(hi)o.info=inf}
   if(ef&&(!o.ef||ef>o.ef))o.ef=ef;if(lit)o.lit=1;
   var dup=o.t.filter(function(t){return t[0]===mn})[0];if(dup){if(pr<dup[1]){dup[1]=pr;if(mx>0)dup[2]=mx}}else o.t.push(mx>0?[mn,pr,mx]:[mn,pr]);
@@ -592,18 +592,25 @@ function pbRange(t){return t[2]>0?gal(Math.max(1,Math.ceil(t[0]-1e-9)))+"–"+ga
 function pbTierLab(m){return gal(Math.max(1,Math.ceil(m-1e-9)))+"+"}
 function pbSrcTxt(v){if(!v)return"";var s=v.src;if(typeof s==="string")return s;return (v.name||"Contract")+(s&&s.gh?" · GitHub "+(s.path||""):"")}
 function pbVTxt(x){return typeof x==="string"?x:(x&&x.gh?"GitHub "+(x.path||""):"")}
+/* Signature base codes → public location names (add more here; names only, never prices) */
+var SIG_BASES={TEB1:"Signature East",TEB2:"Signature West",TEB3:"Signature South",TEB4:"Signature South (Meridian)"};
+function sigBaseName(b){return SIG_BASES[String(b||"").trim().toUpperCase()]||null}
+function sigBaseLab(b){var n=sigBaseName(b);return n?n+" ("+b+")":b}
+function sigBaseFbo(b){return sigBaseName(b)||"Signature "+b}
+function sigBaseOf(f){var m=String(f||"").match(/^Signature ([A-Z0-9]{4})\b/);if(m)return m[1];for(var k in SIG_BASES)if(String(f||"").indexOf(SIG_BASES[k])===0&&(String(f).length===SIG_BASES[k].length||String(f).charAt(SIG_BASES[k].length)===" "))return k;return null}
+function sigKeyMig(k){var p=String(k||"").split("|");if(p.length<3)return k;var m=p[1].match(/^Signature ([A-Z0-9]{4})(\b.*)$/);if(m&&sigBaseName(m[1]))p[1]=sigBaseName(m[1])+m[2];return p.join("|")}
 function pbProv(v){return v?(v.name||v.src||"Contract"):"Contract"}
 function pbProvOf(pb){if(!pb)return"";if(pb.prov)return pb.prov;var v=PB.vendors.filter(function(x){return x.id===pb.vid})[0];if(v)return pbProv(v);var p=pbProfiles().filter(function(x){return x.id===pb.vid})[0];return p?p.name:(pb.v||"Contract")}
 function pbTrunc(s,n){return s.length>n?s.slice(0,n-1)+"…":s}
-function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return pbProv(e.v)+" · "+pbTrunc(o.f,24)+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(o.d&&o.d<pbToday()?" · expired":"")+(o.ef&&o.ef>pbToday()?" · from "+pbDTxt(o.ef,1):"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
-function pbSnap(e){return{k:pbKey(e),v:pbSrcTxt(e.v),prov:pbProv(e.v),vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,fn:e.o.fn||null,note:e.o.note||null,ef:e.o.ef||null,dir:e.o.dir||0,lit:e.o.lit||0,t:e.o.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]}),fe:e.o.fe}}
+function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return pbProv(e.v)+" · "+pbTrunc(o.f,o.sb?30:24)+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(o.d&&o.d<pbToday()?" · expired":"")+(o.ef&&o.ef>pbToday()?" · from "+pbDTxt(o.ef,1):"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
+function pbSnap(e){return{k:pbKey(e),v:pbSrcTxt(e.v),prov:pbProv(e.v),vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,fn:e.o.fn||null,note:e.o.note||null,ef:e.o.ef||null,sb:e.o.sb||null,dir:e.o.dir||0,lit:e.o.lit||0,t:e.o.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]}),fe:e.o.fe}}
 function pbPick(i,key){var l=S.legs[i];if(!l)return;
  var wasSched=!!(l.hdl&&l.hdl.st==="ok"),clr=function(){l.fee="";l.waiver="";l.noWaiver=false;l.feeManual=l.waiverManual=false;delete l.hdl};
  if(!key||key==="manual"){delete l.pb;if(wasSched)clr();return}                         // leaving Signature → blank fee + waiver
- var e=pbOffers(l.from).concat(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===key})[0];if(!e)return;l.pb=pbSnap(e);l.price=+l.pb.t[0][1].toFixed(2);
+ var e=pbOffers(l.from).concat(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===key||pbKey(x)===sigKeyMig(key)})[0];if(!e)return;l.pb=pbSnap(e);l.price=+l.pb.t[0][1].toFixed(2);
  var sig=!!hdlFor(l);if(wasSched)clr();if(sig){l.feeManual=l.waiverManual=false}        // (back) to Signature → schedule values, auto (overrides dropped)
  var m=(S.fboMem||{})[l.from+"|"+e.o.f];if(m){l.fee=m.fee;l.waiver=m.waiver}}   // remembered per airport+FBO values (schedule values win at covered Signature locations)
-function pbRefreshLegs(){S.legs.forEach(function(l){if(!l.pb)return;var e=(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===l.pb.k})[0];if(e){var au=l.pb.auto;l.pb=pbSnap(e);if(au)l.pb.auto=true;l.price=+l.pb.t[0][1].toFixed(2)}})}
+function pbRefreshLegs(){S.legs.forEach(function(l){if(!l.pb)return;var e=(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===l.pb.k||pbKey(x)===sigKeyMig(l.pb.k)})[0];if(e){var au=l.pb.auto;l.pb=pbSnap(e);if(au)l.pb.auto=true;l.price=+l.pb.t[0][1].toFixed(2)}})}
 /* auto-select a Direct (own-contract) price at the departure airport unless the user picked something explicitly on this leg */
 /* contract legs: show the tier price that applies to the planned uplift (all-units) in the price field; costing always uses the tier ladder.
    Typing a price switches the leg to "Manual price" (existing pattern), so a hand-typed price is never overwritten. */
@@ -679,7 +686,8 @@ function hdlPut(v){HS.list=HS.list.filter(function(x){return x.id!==v.id}).conca
 function hdlFor(l){if(!l.pb)return null;var nm=(l.pb.f||"")+" "+(l.pb.fn||"");for(var i=0;i<HS.list.length;i++){var s=HS.list[i],p=HDL_BUILTIN.filter(function(x){return x.id===s.prof})[0];if(p&&p.match.test(nm))return s}
  return HDL_BUILTIN.some(function(p){return p.match.test(nm)})?{none:true,name:HDL_BUILTIN.filter(function(p){return p.match.test(nm)})[0].name}:null}
 function hdlBases(s,icao,code){var A=s.apts[icao];if(!A)return null;var out=[];for(var b in A.b)if(A.b[b][code])out.push({b:b,v:A.b[b][code]});return out.sort(function(a,b){return a.b<b.b?-1:1})}
-function hdlPickBase(l,bs){if(!bs.length)return null;var same=bs.every(function(x){return x.v[0]===bs[0].v[0]&&x.v[1]===bs[0].v[1]});if(same)return{b:bs.length>1?bs.map(function(x){return x.b}).join("/"):bs[0].b,v:bs[0].v,how:bs.length>1?"same at all bases":"only base"};
+function hdlPickBase(l,bs){if(!bs.length)return null;var sb=l.pb.sb||sigBaseOf(l.pb.f);if(sb){var f0=bs.filter(function(x){return x.b===sb})[0];if(f0)return{b:f0.b,v:f0.v,how:"fuel price base"}}
+ var same=bs.every(function(x){return x.v[0]===bs[0].v[0]&&x.v[1]===bs[0].v[1]});if(same)return{b:bs.length>1?bs.map(function(x){return x.b}).join("/"):bs[0].b,v:bs[0].v,how:bs.length>1?"same at all bases":"only base"};
  var mem=hdlCfg().base[l.from+"|"+l.pb.f];if(mem){var m0=bs.filter(function(x){return x.b===mem})[0];if(m0)return{b:m0.b,v:m0.v,how:"chosen"}}
  var t=String((l.pb.fn||"")+" "+l.pb.f).toUpperCase().match(/(?:TERMINAL|\bT)\s*-?\s*(\d+)\b/);if(t){var c=bs.filter(function(x){return new RegExp("\\D"+t[1]+"$").test(x.b)});if(c.length===1)return{b:c[0].b,v:c[0].v,how:"terminal "+t[1]}}
  return null}
@@ -692,11 +700,11 @@ function hdlSync(l){var s=hdlFor(l);if(!s){if(l.hdl){l.noWaiver=false;delete l.h
  if(!l.feeManual)l.fee=fee;if(!l.waiverManual){if(wv==null){l.waiver="";l.noWaiver=true}else{l.waiver=wv;l.noWaiver=false}}else l.noWaiver=false}
 function hdlTxt(h){return "$"+gal(h.fee)+" fee, "+(h.w==null?"no waiver at this location":"waived with "+gal(h.w)+" gal")}
 function hdlHtml(l,i){var h=l.hdl;if(!h)return"";var o='<div class="hint hdl">';
- if(h.st==="ok"){var man=l.feeManual||l.waiverManual;o+='Handling ('+esc(h.name.replace(/ handling$/i,""))+' schedule'+(h.base?', base '+esc(h.base):'')+'): '+esc(hdlTxt(h))+' '+(man?'<span class="tg man">manual</span> <button class="lk" data-hr="'+i+'">↺ reset to schedule</button>':'<span class="tg">auto</span>')}
+ if(h.st==="ok"){var man=l.feeManual||l.waiverManual;o+='Handling ('+esc(h.name.replace(/ handling$/i,""))+' schedule'+(h.base?', base '+esc(h.base.split('/').map(sigBaseLab).join('/')):'')+'): '+esc(hdlTxt(h))+' '+(man?'<span class="tg man">manual</span> <button class="lk" data-hr="'+i+'">↺ reset to schedule</button>':'<span class="tg">auto</span>')}
  else if(h.st==="miss")o+='Not in '+esc(h.name)+' schedule — using '+(blank(l.fee)?'manual entry':'remembered / manual fee and waiver');
  else if(h.st==="nocode")o+=esc(h.name)+': no aircraft type code set for '+esc(acNow().name)+' (Settings › Contract prices › Handling schedules)';
  else if(h.st==="nosched")o+=esc(h.name)+' schedule not imported — enter fee and waiver manually';
- if(h.bases&&h.bases.length>1||h.st==="amb"){var bs=h.bases;o+=(h.st==="amb"?'Handling ('+esc(h.name.replace(/ handling$/i,""))+'): bases differ — pick one':'')+'<br><label class="sm">Base <select data-hb="'+i+'">'+(h.st==="amb"?'<option value="">Pick base…</option>':'')+bs.map(function(x){return '<option value="'+esc(x.b)+'"'+(h.base===x.b?' selected':'')+'>'+esc(x.b+' — $'+gal(x.v[1])+' · '+(x.v[0]==null?'no waiver':gal(x.v[0])+' gal'))+'</option>'}).join("")+'</select></label>'}
+ if(h.bases&&h.bases.length>1||h.st==="amb"){var bs=h.bases;o+=(h.st==="amb"?'Handling ('+esc(h.name.replace(/ handling$/i,""))+'): bases differ — pick one':'')+'<br><label class="sm">Base <select data-hb="'+i+'">'+(h.st==="amb"?'<option value="">Pick base…</option>':'')+bs.map(function(x){return '<option value="'+esc(x.b)+'"'+(h.base===x.b?' selected':'')+'>'+esc(sigBaseLab(x.b)+' — $'+gal(x.v[1])+' · '+(x.v[0]==null?'no waiver':gal(x.v[0])+' gal'))+'</option>'}).join("")+'</select></label>'}
  return o+'</div>'}
 function hdlRep(l){var h=l.hdl;if(!h)return "Handling: entered manually";if(h.st==="ok")return "Handling: "+hdlTxt(h)+" ("+h.name.replace(/ handling$/i,"")+" schedule, base "+h.base+", "+(l.feeManual||l.waiverManual?"manually overridden":"auto")+")";
  return h.st==="miss"?"Handling: not in "+h.name+" schedule — entered manually / remembered":"Handling: entered manually"}
