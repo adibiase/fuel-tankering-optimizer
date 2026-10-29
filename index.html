@@ -70,6 +70,7 @@ body.desk main{max-width:1440px;padding:16px 24px}
 :root{--c-lim:#7a3fd1}@media(prefers-color-scheme:dark){:root{--c-lim:#a67cf0}}
 .wbad{color:var(--bad);font-weight:700}.wwarn{color:var(--warn)}.ch .wl{stroke:var(--c-lim);stroke-width:2;stroke-dasharray:6 3}
 label.nw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lsub{font-size:.8em;font-weight:400;opacity:.75;letter-spacing:0;text-transform:none}
+.ghs{margin:4px 0 8px;padding:10px 0;border-bottom:1px solid var(--bd)}.ghst{font-size:12.5px;color:var(--ok);margin:4px 0;word-break:break-word}.ghtok{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center}.ghtok .btn{margin:0;padding-left:10px;padding-right:10px}.ghhelp ol{padding-left:18px;margin:6px 0}.ghhelp code{font-size:11.5px}
 .pbleg{margin-top:8px}.pbleg select{width:100%}.info{cursor:help;color:var(--t2);font-weight:400}.tg.exp{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--tx);border-color:var(--warn)}.pbl{font-size:12.5px;margin:4px 0 0;font-weight:600}.pbv{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}.pbv .btn{flex:none;margin:0}.pbsum{margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)}.pbsum .kv{font-size:13px}.codes{word-break:break-word}.pbmap{margin-top:10px}.pbmap .tw{overflow-x:auto}.pbmap table{border-collapse:collapse;font-size:12px}.pbmap td{border-bottom:1px solid var(--bd);padding:3px 4px;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}.pbmap th select{font-size:12px;padding:2px}.cnt{font-size:11px;font-weight:400;color:var(--t2);margin-left:6px;text-transform:none;letter-spacing:0}
 .dnote{margin:6px 0 2px;font-size:13px;line-height:1.4;color:var(--tx)}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:1px}.rtab tr.nrow td{text-align:left!important;padding-top:0}.rtab tr:has(+tr.nrow) td{border-bottom:0}.card.close div+div{margin-top:6px}
 .rtab tr.wrow td{font-size:11.5px;color:var(--t2);text-align:left;padding-top:0;white-space:nowrap}.rtab tr:has(+tr.wrow) td{border-bottom:0}
@@ -165,8 +166,7 @@ function optimize(inp){
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
-var SAMPLE_FBOS=[["KHOU","Million Air Houston",3.85,75,50,1],["KTEB","Signature TEB",5.15,350,300,1],["KTEB","Atlantic Aviation TEB",5.05,300,250,1],["KPBI","Signature PBI",4.95,250,200,1],["KPBI","Atlantic Aviation PBI",4.89,225,150,1],["KAPA","Signature APA",4.25,150,100,1],["KAPA","Denver Jet Center",4.10,125,100,0],["KIAH","Atlantic Aviation IAH",4.45,200,150,1]].map(function(f){return{apt:f[0],name:f[1],price:f[2],fee:f[3],waiver:f[4],active:!!f[5]}});
-var RES_LB=5000;function newLeg(){return{fbo:"",from:"",to:"",hours:"",hoursManual:false,wind:"",windManual:false,trip:"",tripManual:false,reserveLb:5000,price:"",fee:"",waiver:"",payload:""}}
+var RES_LB=5000;function newLeg(){return{from:"",to:"",hours:"",hoursManual:false,wind:"",windManual:false,trip:"",tripManual:false,reserveLb:5000,price:"",fee:"",waiver:"",payload:""}}
 function num(v){var x=parseFloat(v);return isNaN(x)?0:x}
 function blank(v){return v==null||String(v).trim()===""}
 function dens(){return num(S.density)||6.7}
@@ -177,12 +177,7 @@ try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.legs)S=JSON.parse(JSON.stringify(SAMPLE));
 if(S.density==null)S.density=6.7;if(S.startLb==null){S.startLb=Math.round(num(S.start)*S.density);delete S.start}
 if(S.fbos){S.legs.forEach(function(l){var f=S.fbos[l.fbo]||{};if(blank(l.price))l.price=f.price==null?"":f.price;if(blank(l.fee))l.fee=f.fee==null?"":f.fee;if(blank(l.waiver))l.waiver=f.waiver==null?"":f.waiver})}
-if(!Array.isArray(S.fbos))S.fbos=JSON.parse(JSON.stringify(SAMPLE_FBOS));
-S.legs.forEach(function(l){if(l.fbo==null||l.fbo===""||!S.fbos[l.fbo])l.fbo=""});
-function legF(l){return l.fbo===""||l.fbo==null?null:S.fbos[l.fbo]||null}
-function fillFbo(l){var f=legF(l);if(f){l.price=f.price;l.fee=f.fee;l.waiver=f.waiver}}
-function fboCustom(l){var f=legF(l);return !!f&&(num(l.price)!==num(f.price)||num(l.fee)!==num(f.fee)||num(l.waiver)!==num(f.waiver)||blank(l.price)||blank(l.fee)||blank(l.waiver))}
-function fboSel(i,sel){return '<select data-p="legs.'+i+'.fbo" aria-label="Departure FBO"><option value=""'+(sel===""?' selected':'')+'>No FBO (type values)</option>'+S.fbos.map(function(f,k){return '<option value="'+k+'"'+(k===sel?' selected':'')+'>'+esc((f.apt||"?")+" – "+(f.name||"FBO"))+(f.active?"":" (inactive)")+" · $"+num(f.price).toFixed(2)+'</option>'}).join("")+'</select>'}
+delete S.fbos;delete S.fboOpen;S.legs.forEach(function(l){delete l.fbo});
 S.aircraft.forEach(function(a){if(a.resLb==null){a.resLb=Math.round(num(a.res)*S.density);delete a.res}});S.legs.forEach(function(l){if(l.reserveLb==null){l.reserveLb=blank(l.reserve)?"":Math.round(num(l.reserve)*S.density);delete l.reserve}});
 function acNow(){return S.aircraft[S.ac]||S.aircraft[0]}
 var APT=null;function aptIdx(){if(APT)return APT;APT={};if(typeof APT_DATA==="string")APT_DATA.split("|").forEach(function(r){var f=r.split(",");APT[f[0]]=[+f[1],+f[2],f[3]]});return APT}
@@ -392,7 +387,6 @@ function render(){S.legs.forEach(function(l,i){l._i=i;syncHours(l);syncTrip(l)})
  S.legs.forEach(function(l,i){h+='<div class="card"><div class="hd"><b>Leg '+(i+1)+'</b>'+(S.legs.length>1?'<button class="btn del" data-del="'+i+'" aria-label="Remove leg">Remove</button>':'')+'</div>';
   h+='<div class="row3"><div><label class="nw">From <span class="lsub">ICAO or IATA</span></label>'+icaoInp("legs."+i+".from",l.fromT||l.from)+'<div class="hint" id="fh'+i+'">'+aptHint(l.fromT||l.from)+'</div></div><div><label class="nw">To <span class="lsub">ICAO or IATA</span></label>'+icaoInp("legs."+i+".to",l.toT||l.to)+'<div class="hint" id="toh'+i+'">'+aptHint(l.toT||l.to)+'</div></div><div><label>Wind % (+tail)</label>'+inp("legs."+i+".wind",l.wind,"decimal","0")+'<div class="hint" id="wh'+i+'">'+windHint(l)+'</div></div></div>';
   h+='<div class="row3"><div><label>Flight hrs</label>'+inp("legs."+i+".hours",l.hours,"decimal")+'<div class="hint" id="hh'+i+'">'+hoursHint(l)+'</div></div><div><label>Trip fuel (gal)</label>'+inp("legs."+i+".trip",l.trip,"decimal")+'<div class="hint" id="th'+i+'">'+tripHint(l)+'</div></div><div><label>Reserve (lb)</label>'+inp("legs."+i+".reserveLb",l.reserveLb,"decimal","5000")+'<div class="hint" id="rh'+i+'">'+resHint(l)+'</div></div></div>';
-  var lf=legF(l);h+='<label>Departure FBO <span class="lsub">optional – prefills price, fee, waiver</span></label>'+fboSel(i,l.fbo)+(lf&&!lf.active?'<div class="hint" style="color:var(--warn)">⚠️ FBO inactive</div>':'')+(fboCustom(l)?'<div class="hd" style="margin-top:6px"><span class="badge">custom</span><button class="btn" data-rfbo="'+i+'">Reset to FBO</button></div>':'');
   h+='<div class="row3"><div><label>Fuel price $/gal</label>'+inp("legs."+i+".price",l.price,"decimal")+'</div><div><label>Handling fee $</label>'+inp("legs."+i+".fee",l.fee,"decimal")+'</div><div><label>Waiver gal</label>'+inp("legs."+i+".waiver",l.waiver,"decimal")+'<div class="hint" id="wvh'+i+'">'+wvHint(l)+'</div></div></div>'+pbLegHtml(l,i)+(wOn()?'<div class="row"><div><label>Payload (lb)</label>'+inp("legs."+i+".payload",l.payload,"decimal",gal(acNow().payload))+'<div class="hint">'+(blank(l.payload)?'blank = default '+gal(acNow().payload)+' lb':'≈ '+gal(plLb(l))+' lb pax + bags + cargo')+'</div></div><div class="hint" style="align-self:center">Zero-fuel wt '+gal(num(acNow().bow)+plLb(l))+' lb</div></div>':'')+'</div>'});
  if(S.legs.length<6)h+='<button class="btn full" id="add">+ Add leg</button>';
  h+='<h2>Forecast winds</h2>';
@@ -421,9 +415,7 @@ function render(){S.legs.forEach(function(l,i){l._i=i;syncHours(l);syncTrip(l)})
  h+='<details class="card"><summary>Aircraft table ('+S.aircraft.length+')</summary>';
  S.aircraft.forEach(function(x,i){h+='<div style="border-top:1px solid var(--bd);margin-top:8px;padding-top:4px"><label>Name</label><input data-p="aircraft.'+i+'.name" value="'+esc(x.name)+'"><div class="row"><div><label>Penalty rate (per hr, 0.03 = 3%)</label>'+inp("aircraft."+i+".rate",x.rate,"decimal")+'</div><div><label>Max usable (gal)</label>'+inp("aircraft."+i+".cap",x.cap,"decimal")+'</div><div><label>Default reserve (lb)</label>'+inp("aircraft."+i+".resLb",x.resLb,"decimal")+'</div><div><label>Avg burn (gal/hr)</label>'+inp("aircraft."+i+".burn",x.burn,"decimal")+'</div><div><label>BOW (lb) – typical; enter your tail’s actual</label>'+inp("aircraft."+i+".bow",x.bow,"decimal")+'</div><div><label>Max ramp (lb)</label>'+inp("aircraft."+i+".ramp",x.ramp,"decimal")+'</div><div><label>MTOW (lb)</label>'+inp("aircraft."+i+".mtow",x.mtow,"decimal")+'</div><div><label>MLW (lb)</label>'+inp("aircraft."+i+".mlw",x.mlw,"decimal")+'</div><div><label>Default payload (lb: pax + bags + cargo; crew in BOW)</label>'+inp("aircraft."+i+".payload",x.payload,"decimal")+'</div><div><label>Taxi fuel (lb, ramp check)</label>'+inp("aircraft."+i+".taxi",x.taxi,"decimal")+'</div><div><label>Cruise TAS (kt)</label>'+inp("aircraft."+i+".tas",x.tas,"decimal")+'</div><div><label>Taxi/climb/descent allowance (hrs)</label>'+inp("aircraft."+i+".allow",x.allow,"decimal")+'</div><div><label>Routing factor (% extra distance)</label>'+inp("aircraft."+i+".route",x.route,"decimal")+'</div><div><label>Cruise level (winds)</label><select data-p="aircraft.'+i+'.plev">'+[300,250,200].map(function(v){return'<option value="'+v+'"'+(+x.plev===v?' selected':'')+'>'+v+' hPa (~'+PLEV[v]+')</option>'}).join("")+'</select></div></div>'+(S.aircraft.length>1?'<button class="btn del full" data-delac="'+i+'">Delete aircraft</button>':'')+'</div>'});
  h+='<button class="btn full" id="addac">+ Add aircraft</button></details>';
- h+='<details id="fbod" class="card"'+(S.fboOpen?' open':'')+'><summary>FBO list ('+S.fbos.length+') – sample prices, illustrative</summary><p class="muted">Pick an FBO on a leg card to prefill its price, fee and waiver. Editing a price here does not change legs already filled (they show “custom” – tap Reset to FBO).</p>';
- S.fbos.forEach(function(f,i){h+='<div style="border-top:1px solid var(--bd);margin-top:8px;padding-top:4px"><div class="row"><div><label>Airport</label>'+icaoInp("fbos."+i+".apt",f.apt)+'</div><div><label>FBO name</label><input data-p="fbos.'+i+'.name" value="'+esc(f.name)+'"></div></div><div class="row3"><div><label>Price $/gal</label>'+inp("fbos."+i+".price",f.price,"decimal")+'</div><div><label>Handling $</label>'+inp("fbos."+i+".fee",f.fee,"decimal")+'</div><div><label>Waiver gal</label>'+inp("fbos."+i+".waiver",f.waiver,"decimal")+'</div></div><div class="tog"><span>Active</span><label class="sw"><input type="checkbox" data-fact="'+i+'"'+(f.active?' checked':'')+'><span></span></label></div><button class="btn del full" data-delfbo="'+i+'">Delete FBO</button></div>'});
- h+='<button class="btn full" id="addfbo">+ Add FBO</button></details>'}
+ }
  h+='<button class="btn full del" id="reset">Clear trip</button><p class="muted">Model mirrors Fuel_Tankering_Optimizer.xlsx: backward pass with burn penalty, per-stop candidates (need / waiver min / tanker thru legs ahead, capped at max fuel) with waiver-credit rule, exhaustive search. Per-leg fuel price, handling fee and waiver gallons are entered on each leg card. Planning tool – verify against flight-plan fuel. Data saved on this device only.</p>';
  var hS=h,dk=DESK();h=dk?'<div class="dk"><div class="lcol">'+hA+hS+'</div><div class="rcol">'+hR+'</div></div>':hA+hR+hS;
  if(typeof document!=="undefined"&&document.body&&document.body.classList)document.body.classList.toggle("desk",dk);
@@ -444,9 +436,12 @@ function legInput(p){var m=p.match(/^legs\.(\d+)\.(from|to|wind|hours|trip|reser
 function setPath(p,v){var k=p.split("."),o=S;for(var i=0;i<k.length-1;i++)o=o[k[i]];o[k[k.length-1]]=v}
 document.addEventListener("input",function(e){var p=e.target.getAttribute("data-p");if(!p||e.target.tagName==="SELECT")return;var t=e.target;if(/^legs\.\d+\.(from|to)$/.test(p)){var v=t.value,n=icaoNorm(v);if(n!==v){var c=t.selectionStart;c=c==null?n.length:icaoNorm(v.slice(0,c)).length;t.value=n;try{t.setSelectionRange&&t.setSelectionRange(c,c)}catch(x){}}}var mm=p.match(/^legs\.(\d+)\.(from|to)$/);if(mm){var lg=S.legs[+mm[1]];lg[mm[2]+"T"]=t.value;lg[mm[2]]=aptIcao(t.value)}else setPath(p,t.value);var pm=p.match(/^legs\.(\d+)\.(price|fee|waiver)$/);if(pm){var lp=S.legs[+pm[1]];if(pm[2]==="price"&&lp.pb){delete lp.pb;var se=document.querySelector('[data-pb="'+pm[1]+'"]');if(se)se.value="manual"}else pbMem(lp)}legInput(p);save();bar(compute())});
 document.addEventListener("change",function(e){var t=e.target,p=t.getAttribute("data-p");
- if(p){var mm=p.match(/^legs\.(\d+)\.(from|to)$/);if(mm){var lg=S.legs[+mm[1]];lg[mm[2]+"T"]=icaoNorm(t.value);lg[mm[2]]=aptIcao(t.value)}else{var fm=p.match(/^legs\.(\d+)\.fbo$/);if(fm){S.legs[+fm[1]].fbo=t.value===""?"":+t.value;fillFbo(S.legs[+fm[1]])}else setPath(p,t.tagName==="SELECT"?+t.value:t.value)}}else if(t.id==="cz")S.chargeZero=t.checked;else if(t.hasAttribute("data-fact"))S.fbos[+t.getAttribute("data-fact")].active=t.checked;
+ if(p){var mm=p.match(/^legs\.(\d+)\.(from|to)$/);if(mm){var lg=S.legs[+mm[1]];lg[mm[2]+"T"]=icaoNorm(t.value);lg[mm[2]]=aptIcao(t.value)}else setPath(p,t.tagName==="SELECT"?+t.value:t.value)}else if(t.id==="cz")S.chargeZero=t.checked;
  else if(t.hasAttribute&&t.hasAttribute("data-pb"))pbPick(+t.getAttribute("data-pb"),t.value);
  else if(t.id==="useadd")S.useAdd=t.checked;
+ else if(t.id==="ghrepo"||t.id==="ghbranch"){var g0=ghCfg();g0[t.id==="ghrepo"?"repo":"branch"]=String(t.value).trim();g0.folders=null;g0.lastCheck=0}
+ else if(t.id==="ghtok"){ghSetTok(String(t.value).trim());ghCfg().lastCheck=0;ghCfg().err=null}
+ else if(t.hasAttribute&&t.hasAttribute("data-ghv")){var gv0=ghCfg().v[t.getAttribute("data-ghv")];if(gv0)gv0.on=t.checked}
  else if(t.hasAttribute&&t.hasAttribute("data-pbmap")){PB.pending.map[t.getAttribute("data-pbmap")]=t.value;return}
  else if(t.id==="pbhdr"){PB.pending.header=t.value==="1"}else if(t.id==="pbct"){PB.pending.codeType=t.value;return}else if(t.id==="pbname"){PB.pending.name=t.value;return}
  else if(t.id==="pbfile"){var fl=t.files&&t.files[0];if(!fl)return;PB.busy=true;render();var rd=new FileReader();rd.onload=function(){setTimeout(function(){pbHandleText(String(rd.result),fl.name,function(){PB.busy=false;render();save()})},20)};rd.onerror=function(){PB.busy=false;PB.err="Could not read the file.";render()};rd.readAsText(fl);return}
@@ -454,9 +449,6 @@ document.addEventListener("change",function(e){var t=e.target,p=t.getAttribute("
 document.addEventListener("click",function(e){var t=e.target.closest("button");if(!t)return;var d;
  if(t.hasAttribute("data-ac"))S.ac=+t.getAttribute("data-ac");
  else if((d=t.getAttribute("data-del"))!=null)S.legs.splice(+d,1);
- else if((d=t.getAttribute("data-rfbo"))!=null)fillFbo(S.legs[+d]);
- else if(t.id==="addfbo")S.fbos.push({apt:"",name:"New FBO",price:4.5,fee:150,waiver:100,active:true});
- else if((d=t.getAttribute("data-delfbo"))!=null){d=+d;if(S.legs.some(function(l){return l.fbo===d})){alert("This FBO is picked on a leg – change that leg first.");return}S.fbos.splice(d,1);S.legs.forEach(function(l){if(l.fbo!==""&&l.fbo>d)l.fbo--})}
  else if((d=t.getAttribute("data-rt"))!=null){S.legs[+d].tripManual=false;S.legs[+d].trip=""}
  else if((d=t.getAttribute("data-rh"))!=null){S.legs[+d].hoursManual=false;S.legs[+d].hours=""}
  else if((d=t.getAttribute("data-rw"))!=null){var lw=S.legs[+d];lw.windManual=false;if(lw.windF&&lw.windF.pct!=null)lw.wind=lw.windF.pct}
@@ -464,6 +456,9 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
  else if(t.hasAttribute("data-view"))S.view=t.getAttribute("data-view");
  else if(t.id==="settog")S.setOpen=!S.setOpen;
  else if(t.id==="pbtog")S.pbOpen=!S.pbOpen;
+ else if(t.id==="ghshow")PB.ghShow=!PB.ghShow;
+ else if(t.id==="ghclr"){ghSetTok("");PB.ghShow=false}
+ else if(t.id==="ghref"||t.id==="ghlist"){var te=$("#ghtok");if(te&&te.value!=null&&String(te.value).trim()!==ghTok())ghSetTok(String(te.value).trim());var f0=t.id==="ghref"?function(cb){ghSync(true,cb)}:ghList;f0(function(){ghCfg().busy=false;render();save()});ghCfg().busy=t.id==="ghref";}
  else if(t.id==="pbimp"){var fi=$("#pbfile");if(fi){fi.value="";fi.click()}return}
  else if((d=t.getAttribute("data-pbdel"))!=null){if(typeof confirm==="function"&&!confirm("Remove these contract prices from this device?"))return;pbDel(d);if(PB.last&&PB.last.id===d)PB.last=null}
  else if(t.id==="pbsave"){var ne=$("#pbname");if(ne&&PB.pending)PB.pending.name=ne.value;pbSaveMap()}
@@ -472,12 +467,11 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
   if(t.id==="email")window.location.href=mailtoHref(rr);
   else if(t.id==="share"){navigator.share({title:reportSubject(),text:reportText(rr)}).catch(function(){})}
   else copyText(reportSubject()+"\r\n\r\n"+reportText(rr));return}
- else if(t.id==="add"){var last=S.legs[S.legs.length-1]||{to:""},nl=newLeg();if(blank(nl.from))nl.from=last.to||"";var fx=S.fbos.findIndex(function(f){return f.active&&!blank(nl.from)&&aptIcao(f.apt)===nl.from});if(fx>=0){nl.fbo=fx;fillFbo(nl)}S.legs.push(nl)}
+ else if(t.id==="add"){var last=S.legs[S.legs.length-1]||{to:""},nl=newLeg();if(blank(nl.from))nl.from=last.to||"";S.legs.push(nl)}
  else if((d=t.getAttribute("data-delac"))!=null){S.aircraft.splice(+d,1);S.ac=0}
  else if(t.id==="addac")S.aircraft.push({name:"New aircraft",rate:0.03,cap:3000,resLb:5000,burn:300,tas:450,plev:250,allow:0.3,route:5,payload:0});
- else if(t.id==="reset"){if(!confirm("Clear all trip data?"))return;var keepF=S.fbos;S=JSON.parse(JSON.stringify(SAMPLE));S.fbos=keepF}
+ else if(t.id==="reset"){if(!confirm("Clear all trip data?"))return;S=JSON.parse(JSON.stringify(SAMPLE))}
  else return;render();save()});
-document.addEventListener("toggle",function(e){if(e.target&&e.target.id==="fbod"){S.fboOpen=e.target.open;save()}},true);
 /* ---- Contract price book: vendor CSV import, stored on this device only (IndexedDB) ---- */
 var PB={vendors:[],idx:{},last:null,pending:null,busy:false},PB_TODAY=null,MON="JanFebMarAprMayJunJulAugSepOctNovDec";
 var PB_FIELDS=[["ignore","Ignore"],["code","Airport"],["country","Country"],["fbo","FBO"],["min","Tier min gal"],["price","Price"],["product","Product"],["date","Date"],["notes","Notes"]];
@@ -573,7 +567,7 @@ function pbSection(){var nA=Object.keys(PB.idx).length,h='<h2><button class="set
  if(!S.pbOpen)return h;h+='<div class="card pbc">';
  if(!PB.vendors.length)h+='<p class="muted" style="margin-top:0">No contract prices yet. Import your vendor’s CSV (e.g. the weekly World Fuel price file) to pick FBOs and tier prices on each leg.</p>';
  PB.vendors.forEach(function(v){var s=v.sum;h+='<div class="pbv"><div><b>'+esc(v.name)+'</b><div class="sm">Imported '+pbDTxt(v.imported.slice(0,10))+' · '+gal(s.imported)+' prices · '+gal(s.airports)+' airports · '+gal(s.fbos)+' FBOs'+(s.expOffers?' · <span class="tg exp">'+gal(s.expOffers)+' expired</span>':'')+'</div></div><button class="btn del" data-pbdel="'+esc(v.id)+'">Remove</button></div>'});
- h+='<button class="btn full pri" id="pbimp"'+(PB.busy?' disabled':'')+'>'+(PB.busy?'⏳ Importing…':'⇪ Import CSV')+'</button><input type="file" id="pbfile" accept=".csv,text/csv,text/plain" style="display:none">';
+ h+=ghHtml();h+='<p class="sm" style="margin:12px 0 4px"><b>Or import a CSV file</b></p>';h+='<button class="btn full" id="pbimp"'+(PB.busy?' disabled':'')+'>'+(PB.busy?'⏳ Importing…':'⇪ Import CSV')+'</button><input type="file" id="pbfile" accept=".csv,text/csv,text/plain" style="display:none">';
  h+='<p class="muted">Re-importing a vendor’s file replaces its old prices. Prices are stored on this device only and are never uploaded. <span class="info" title="'+esc(TIER_TIP)+'">ⓘ How tiers are priced</span></p>';
  h+='<div class="tog"><span>Use additive prices (JETA-ADDITIVE)</span><label class="sw"><input type="checkbox" id="useadd"'+(S.useAdd?' checked':'')+'><span></span></label></div>';
  if(PB.err)h+='<div class="card warn">⚠️ '+esc(PB.err)+'</div>';
@@ -585,7 +579,60 @@ function pbHandleText(text,file,cb){PB.err=null;PB.last=null;PB.pending=null;var
 function pbSaveMap(){var P=PB.pending,cols={};for(var c in P.map)if(P.map[c]&&P.map[c]!=="ignore")cols[P.map[c]]=P.header?String(P.all[0][c]||"").trim():+c;
  if(cols.code==null||cols.price==null){PB.err="Pick at least the Airport and Price columns.";return false}
  var nm=String(P.name||"").trim()||"Vendor "+((S.pbProfiles||[]).length+1),prof={id:"u_"+nm.toLowerCase().replace(/[^a-z0-9]+/g,"_"),name:nm,header:!!P.header,codeType:P.codeType||"auto",cols:cols,ncol:P.header?0:P.ncol};
- S.pbProfiles=(S.pbProfiles||[]).filter(function(x){return x.id!==prof.id}).concat([prof]);var v=pbBuild(P.all,prof);v.file=P.file||"";PB.last=v;PB.pending=null;PB.err=null;pbPut(v);return true}
-render();pbLoad(function(){if(PB.vendors.length){render();save()}});
+ S.pbProfiles=(S.pbProfiles||[]).filter(function(x){return x.id!==prof.id}).concat([prof]);var v=pbBuild(P.all,prof);v.file=P.file||"";
+ if(P.gh){var g=ghCfg(),gv=g.v[P.gh.f]=g.v[P.gh.f]||{on:true};v.src={gh:g.repo,branch:g.branch,path:P.gh.f+"/latest.csv",sha:P.gh.sha,at:Date.now()};gv.sha=P.gh.sha;gv.at=gv.checked=Date.now();gv.profile=prof.id;gv.name=prof.name;gv.err=null}PB.last=v;PB.pending=null;PB.err=null;pbPut(v);return true}
+/* ---- Contract prices from a PRIVATE GitHub repo (REST API, fine-grained token kept on this device only) ---- */
+var GH_KEY="tankering.ghtoken",GH_EVERY=6*3600e3,GH_API="https://api.github.com/repos/";
+function ghTok(){try{return localStorage.getItem(GH_KEY)||""}catch(e){return""}}
+function ghSetTok(v){try{if(v)localStorage.setItem(GH_KEY,v);else localStorage.removeItem(GH_KEY)}catch(e){}}
+function ghCfg(){var g=S.gh=S.gh||{};if(!g.repo)g.repo="adibiase/fuel-prices";if(!g.branch)g.branch="main";g.v=g.v||{};return g}
+function ghOnline(){return !(typeof navigator!=="undefined"&&navigator&&navigator.onLine===false)}
+function ghFetch(path,accept,cb){var g=ghCfg(),off={off:true,msg:"Offline or GitHub unreachable — using the prices saved on this device."};
+ if(typeof fetch!=="function"||!ghOnline()){cb(off);return}
+ var sep=path.indexOf("?")>=0?"&":"?",url=GH_API+g.repo.replace(/^\/+|\/+$/g,"")+"/"+path+(/^git\//.test(path)?"":sep+"ref="+encodeURIComponent(g.branch));
+ fetch(url,{headers:{"Authorization":"Bearer "+ghTok(),"Accept":accept,"X-GitHub-Api-Version":"2022-11-28"},cache:"no-store"}).then(function(r){
+  if(r.ok)return(/raw/.test(accept)?r.text():r.json()).then(function(d){cb(null,d)});
+  var H=function(k){return r.headers&&r.headers.get?r.headers.get(k):null},rem=H("x-ratelimit-remaining"),rs=+H("x-ratelimit-reset");
+  var m=r.status===401?"GitHub rejected the token (401): it is wrong or has expired. Create a new token and paste it here.":
+   r.status===404?"Not found (404): check the repo and branch names, and that the token was given access to this repo (Contents: Read-only).":
+   (r.status===429||(r.status===403&&rem==="0"))?"GitHub rate limit reached"+(rs?" — try again after "+new Date(rs*1000).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"")+". Using the prices saved on this device.":
+   r.status===403?"Access denied (403): the token lacks Contents read permission for this repo.":"GitHub error "+r.status+".";
+  cb({status:r.status,msg:m})}).catch(function(){cb(off)})}
+function ghWhen(t){var d=new Date(t);return pbDTxt(d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate()))+" "+p2(d.getHours())+":"+p2(d.getMinutes())}
+/* list vendor folders: top-level dirs, each expected to hold latest.csv */
+function ghList(cb){ghFetch("contents/","application/vnd.github+json",function(e,d){var g=ghCfg();if(e){g.err=e.msg;cb&&cb(e);return}
+ g.folders=(Array.isArray(d)?d:[]).filter(function(x){return x.type==="dir"&&x.name.charAt(0)!=="."}).map(function(x){return x.name});
+ g.folders.forEach(function(f){if(!g.v[f])g.v[f]={on:true}});g.err=null;cb&&cb(null)})}
+/* check + download changed files, import through the profile pipeline */
+function ghSync(force,cb){var g=ghCfg();if(!ghTok()){g.err="Paste a GitHub token first.";cb&&cb();return}
+ g.busy=true;ghList(function(e){if(e){g.busy=false;g.lastCheck=Date.now();cb&&cb();return}
+  var todo=g.folders.filter(function(f){return g.v[f].on}),log=[];
+  (function next(){if(!todo.length){g.busy=false;g.lastCheck=Date.now();g.msg=log.join(" · ");cb&&cb();return}var f=todo.shift(),gv=g.v[f];
+   ghFetch("contents/"+encodeURIComponent(f),"application/vnd.github+json",function(e,d){if(e){g.err=e.msg;log.push(f+": "+e.msg);next();return}
+    var ent=(Array.isArray(d)?d:[]).filter(function(x){return x.type==="file"&&/^latest\.csv$/i.test(x.name)})[0];
+    if(!ent){gv.err="no latest.csv in "+f+"/";log.push(f+": no latest.csv");next();return}
+    var have=PB.vendors.filter(function(v){return v.src&&v.src.path===f+"/"+ent.name&&v.src.sha===ent.sha})[0];
+    if(!force&&have&&gv.sha===ent.sha){gv.checked=Date.now();gv.err=null;log.push(f+": unchanged");next();return}   // sha unchanged → skip download
+    var done=function(text){var rows=csvParse(text),p=pbDetect(rows)||pbProfiles().filter(function(x){return x.id===gv.profile})[0];
+     if(!p){PB.pending={rows:rows.slice(0,6),all:rows,ncol:Math.max.apply(null,rows.slice(0,30).map(function(r){return r.length}).concat([0])),file:"GitHub "+f+"/latest.csv",map:{},header:false,codeType:"auto",name:f,gh:{f:f,sha:ent.sha}};gv.err="layout not recognised — map the columns below";log.push(f+": needs column mapping");next();return}
+     var v=pbBuild(rows,p);v.file=f+"/latest.csv";v.src={gh:g.repo,branch:g.branch,path:f+"/"+ent.name,sha:ent.sha,at:Date.now()};pbPut(v);PB.last=v;
+     gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.profile=p.id;gv.name=p.name;gv.err=null;g.err=null;log.push(f+": updated");next()};
+    // raw media type works for files up to 100 MB (the JSON form returns no content above 1 MB); fall back to the git blob by sha
+    ghFetch("contents/"+encodeURIComponent(f)+"/"+encodeURIComponent(ent.name),"application/vnd.github.raw",function(e,t){
+     if(!e&&t&&t.length)return done(t);
+     if(e&&(e.status===401||e.off)){g.err=e.msg;log.push(f+": "+e.msg);next();return}
+     ghFetch("git/blobs/"+ent.sha,"application/vnd.github.raw",function(e2,t2){if(e2||!t2){g.err=(e2||{}).msg||"Download failed.";log.push(f+": download failed");next();return}done(t2)})})})})()})}
+function ghAuto(){var g=ghCfg();if(!ghTok()||!ghOnline()||g.busy)return;if(g.lastCheck&&Date.now()-g.lastCheck<GH_EVERY)return;ghSync(false,function(){render();save()})}
+function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from GitHub</b> <span class="lsub">private repo</span>';
+ Object.keys(g.v).forEach(function(f){var v=g.v[f];if(v.sha&&v.on)h+='<div class="ghst">✓ Prices from GitHub · '+esc(v.name||f)+' · updated '+ghWhen(v.at)+' · sha '+esc(v.sha.slice(0,7))+(v.checked&&v.checked>v.at?' <span class="lbu">(checked '+ghWhen(v.checked)+')</span>':'')+'</div>'});
+ if(g.err)h+='<div class="card warn">⚠️ '+esc(g.err)+'</div>';
+ h+='<div class="row"><div><label>Repo (owner/name)</label><input id="ghrepo" value="'+esc(g.repo)+'" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div><label>Branch</label><input id="ghbranch" value="'+esc(g.branch)+'" autocapitalize="off" autocorrect="off" spellcheck="false"></div></div>';
+ h+='<label>Fine-grained access token <span class="lsub">saved on this device only</span></label><div class="ghtok"><input id="ghtok" type="'+(PB.ghShow?'text':'password')+'" value="'+esc(tok)+'" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="btn" id="ghshow">'+(PB.ghShow?'Hide':'Show')+'</button><button class="btn" id="ghclr">Clear</button></div>';
+ if(g.folders&&g.folders.length){h+='<label>Vendor files (folder/latest.csv)</label>';g.folders.forEach(function(f){var v=g.v[f]||{};h+='<div class="tog"><span>'+esc(f)+'/latest.csv'+(v.name?' <span class="lbu">· '+esc(v.name)+'</span>':'')+(v.err?' <span class="tg exp">'+esc(v.err)+'</span>':'')+'</span><label class="sw"><input type="checkbox" data-ghv="'+esc(f)+'"'+(v.on?' checked':'')+'><span></span></label></div>'})}
+ h+='<div class="row"><button class="btn pri" id="ghref"'+(g.busy||!tok?' disabled':'')+'>'+(g.busy?'⏳ Checking…':(g.folders?'↻ Refresh now':'Connect & load'))+'</button><button class="btn" id="ghlist"'+(g.busy||!tok?' disabled':'')+'>List vendors</button></div>';
+ h+='<p class="muted">Checks GitHub when the app opens (at most every 6 hours) and downloads a file only when it changed. Offline, the prices saved on this device are used.</p>';
+ h+='<details class="ghhelp"><summary class="sm">How to create a token</summary><ol class="sm"><li>GitHub › Settings › Developer settings › Fine-grained tokens › <b>Generate new token</b> (<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">open</a>).</li><li>Repository access: <b>Only select repositories</b> → <code>adibiase/fuel-prices</code>.</li><li>Permissions: <b>Contents → Read-only</b> (nothing else).</li><li>Set an expiration (e.g. 90 days), generate, copy the token and paste it above.</li></ol><p class="sm">The token stays in this browser’s storage on this device; it is never put in reports or sent anywhere except api.github.com.</p></details>';
+ return h+'</div>'}
+render();pbLoad(function(){if(PB.vendors.length){render();save()}ghAuto()});
 (function(){var f=S.fcst||{},on=typeof navigator==="undefined"||navigator.onLine!==false;if(typeof fetch==="function"&&on&&S.legs.some(function(l){return legRoute(l)})&&(!f.at||Date.now()-f.at>3600e3))fetchWinds(function(){render();save()})})();
 </script></body></html>
