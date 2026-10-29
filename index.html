@@ -296,7 +296,7 @@ function closeTxt(s){return "Close call at "+(s.from||"?")+": this buy only save
 function noteHtml(s){return s?'<div class="dnote"><i class="dot" style="background:'+LCOL[s.lvl]+'" title="'+s.lvl+'"></i>'+esc(noteTxt(s))+'</div>':""}
 function tierTxt(x,l){var f=l&&l.fbo;if(!f||!f.name)return"";var t=l.tiers?l.tiers[Math.max(0,x.ti)]:null;return f.name+(t?", "+pbTierLab(t[0])+" gal tier $"+x.tp.toFixed(2):" $"+x.tp.toFixed(2))}
 function pbLine(x,l,html){var sl=S.legs[l.i]||{},pb=sl.pb;if(!pb||!l.fbo||!l.fbo.name)return"";var ex=pb.d&&pb.d<pbToday(),t=tierTxt(x,l);
- if(!html)return "Contract: "+t+" ("+pb.v+(pb.d?", price date "+pbDTxt(pb.d)+(ex?" EXPIRED":""):"")+(pb.r?", received "+pbDTxt(pb.r)+(pbStale(pb)?" — older than "+(pb.sd||14)+" days":""):"")+")"+(pb.info&&pb.info.posted!=null?" · "+pbInfoTxt(pb.info):"")+(pb.fe&&pb.fe.length?" · per-flight fees not included: "+pbFeeTxt(pb.fe):"");
+ if(!html){var dd=(pb.d?"price date "+pbDTxt(pb.d)+(ex?" EXPIRED":""):"")+(pb.r?(pb.d?", ":"")+"received "+pbDTxt(pb.r)+(pbStale(pb)?" — older than "+(pb.sd||14)+" days":""):"");return "Contract: "+pbProvOf(pb)+" — "+t+(dd?" ("+dd+")":"")+(pb.info&&pb.info.posted!=null?" · "+pbInfoTxt(pb.info):"")+(pb.fe&&pb.fe.length?" · per-flight fees not included: "+pbFeeTxt(pb.fe):"");}
  return '<div class="pbl">'+esc(t)+' <span class="lbu">· '+esc(pb.v)+'</span>'+(ex?' <span class="tg exp">expired '+pbDTxt(pb.d,1)+'</span>':'')+(pbStale(pb)?' <span class="tg exp">older than '+(pb.sd||14)+' days</span>':'')+'</div>'}
 function closeCard(sv){if(!sv||!sv.close.length)return"";return '<div class="card warn close">'+sv.close.map(function(s){return '<div>⚠️ '+esc(closeTxt(s))+'</div>'}).join("")+'</div>'}
 function sensText(sv){if(!sv||!sv.close.length)return[];var L=["CLOSE CALLS"];sv.close.forEach(function(s){L.push("• "+closeTxt(s))});return L}
@@ -545,8 +545,11 @@ function pbKey(e){return e.v.id+"|"+e.o.f+"|"+e.o.p}
 function pbOffers(icao){return (PB.idx[icao]||[]).filter(function(e){return S.useAdd||!e.o.x}).slice().sort(function(a,b){return a.o.t[0][1]-b.o.t[0][1]})}
 function pbBest(t){var b=t[0];t.forEach(function(x){if(x[1]<b[1])b=x});return b}
 function pbTierLab(m){return gal(Math.max(1,Math.ceil(m-1e-9)))+"+"}
-function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return o.f+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(multi?" ("+(e.v.src||e.v.name)+")":"")+(o.d&&o.d<pbToday()?" · expired":"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
-function pbSnap(e){return{k:pbKey(e),v:e.v.src||e.v.name,vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,t:e.o.t.map(function(t){return[t[0],t[1]]}),fe:e.o.fe}}
+function pbProv(v){return v?(v.name||v.src||"Contract"):"Contract"}
+function pbProvOf(pb){if(!pb)return"";if(pb.prov)return pb.prov;var v=PB.vendors.filter(function(x){return x.id===pb.vid})[0];if(v)return pbProv(v);var p=pbProfiles().filter(function(x){return x.id===pb.vid})[0];return p?p.name:(pb.v||"Contract")}
+function pbTrunc(s,n){return s.length>n?s.slice(0,n-1)+"…":s}
+function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return pbProv(e.v)+" · "+pbTrunc(o.f,24)+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(o.d&&o.d<pbToday()?" · expired":"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
+function pbSnap(e){return{k:pbKey(e),v:e.v.src||e.v.name,prov:pbProv(e.v),vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,t:e.o.t.map(function(t){return[t[0],t[1]]}),fe:e.o.fe}}
 function pbPick(i,key){var l=S.legs[i];if(!l)return;if(!key||key==="manual"){delete l.pb;return}
  var e=pbOffers(l.from).concat(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===key})[0];if(!e)return;l.pb=pbSnap(e);l.price=l.pb.t[0][1];
  var m=(S.fboMem||{})[l.from+"|"+e.o.f];if(m){l.fee=m.fee;l.waiver=m.waiver}}
@@ -557,7 +560,7 @@ function pbLegHtml(l,i){var of=pbOffers(l.from),cur=l.pb;if(!of.length&&!cur)ret
  var h='<div class="pbleg"><label>Contract FBO at '+esc(l.from)+' <span class="info" title="'+esc(TIER_TIP)+'">ⓘ</span></label><select data-pb="'+i+'"><option value="manual">Manual price</option>';
  var has=false;of.forEach(function(e){var k=pbKey(e);if(cur&&cur.k===k)has=true;h+='<option value="'+esc(k)+'"'+(cur&&cur.k===k?' selected':'')+'>'+esc(pbOptLab(e,multi))+'</option>'});
  if(cur&&!has)h+='<option value="'+esc(cur.k)+'" selected>'+esc(cur.f+" (saved)")+'</option>';h+='</select>';
- if(cur){h+='<div class="hint">'+esc(cur.v)+(cur.d?' · price date '+pbDTxt(cur.d):'')+(cur.r?' · received '+pbDTxt(cur.r):'')+(ex?' <span class="tg exp">expired '+pbDTxt(cur.d,1)+'</span>':'')+(pbStale(cur)?' <span class="tg exp">older than '+(cur.sd||14)+' days</span>':'')+'<br>'+(cur.t.length>1?'Tiers: '+cur.t.map(function(t){return pbTierLab(t[0])+' $'+t[1].toFixed(2)}).join(' · '):'Contract $'+cur.t[0][1].toFixed(2)+'/gal (one price)')+(cur.info&&cur.info.posted!=null?' · '+esc(pbInfoTxt(cur.info)):'')+'</div>'+(cur.fe&&cur.fe.length?'<div class="hint">ⓘ Per-flight fees (not included): '+esc(pbFeeTxt(cur.fe))+'</div>':'')}
+ if(cur){h+='<div class="hint">Contract provider: <b>'+esc(pbProvOf(cur))+'</b><br>'+esc(cur.v)+(cur.d?' · price date '+pbDTxt(cur.d):'')+(cur.r?' · received '+pbDTxt(cur.r):'')+(ex?' <span class="tg exp">expired '+pbDTxt(cur.d,1)+'</span>':'')+(pbStale(cur)?' <span class="tg exp">older than '+(cur.sd||14)+' days</span>':'')+'<br>'+(cur.t.length>1?'Tiers: '+cur.t.map(function(t){return pbTierLab(t[0])+' $'+t[1].toFixed(2)}).join(' · '):'Contract $'+cur.t[0][1].toFixed(2)+'/gal (one price)')+(cur.info&&cur.info.posted!=null?' · '+esc(pbInfoTxt(cur.info)):'')+'</div>'+(cur.fe&&cur.fe.length?'<div class="hint">ⓘ Per-flight fees (not included): '+esc(pbFeeTxt(cur.fe))+'</div>':'')}
  else h+='<div class="hint">'+of.length+' contract price'+(of.length>1?'s':'')+' on file — pick one to fill the price.</div>';
  return h+'</div>'}
 function pbSumHtml(s,name){var u=Object.keys(s.unk||{}).sort();return '<div class="pbsum"><b>Imported '+esc(name)+'</b><div class="kv">'+
