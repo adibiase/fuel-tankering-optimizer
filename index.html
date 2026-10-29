@@ -277,7 +277,8 @@ function tripHint(l){return (l.tripManual?'<span class="tg man">manual</span> <b
 function resHint(l){return '≈ '+gal(resLb(l)/dens())+' gal · '+(resLb(l)<RES_LB?'<span style="color:var(--warn)">below 5,000 lb minimum</span>':'default 5,000 lb')}
 function wvHint(l){return blank(l.waiver)?'':'≈ '+gal(num(l.waiver)*dens())+' lb'}
 S.credit=0;S.aircraft.forEach(function(a){var d=WDEF[a.name];if(d&&a.mtow==null)for(var k in d)a[k]=d[k];if(d&&((a.name==='Gulfstream G650ER'&&+a.payload===1600)||(a.name==='Dassault Falcon 2000LXS'&&+a.payload===1200)))a.payload=0});if(!S.view)S.view="auto";if(S.setOpen==null)S.setOpen=false;S.legs.forEach(function(l){delete l.dep;l.from=icaoNorm(l.from);l.to=icaoNorm(l.to);["from","to"].forEach(function(f){if(l[f+"T"]!=null)l[f+"T"]=icaoNorm(l[f+"T"]);var t=l[f+"T"]||l[f];if(t)l[f]=aptIcao(t)});if(l.hoursManual==null)l.hoursManual=!blank(l.hours);if(l.tripManual==null)l.tripManual=!blank(l.trip)});
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"?undefined:v}))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="ovBusy"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
+if(S&&S.gh){delete S.gh.busy;delete S.gh.ovBusy;delete S.gh.runId}   // stale "Checking…" from a run killed mid-check (page closed / iOS suspended) used to lock the button forever
 var $=function(s){return document.querySelector(s)};
 function money(v){return v==null?"n/a":"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fq(g,d){return '<span class="fq">'+gal(g,d)+' gal<span class="lbu"> · '+gal(g*dens())+' lb</span></span>'}
@@ -636,7 +637,8 @@ function pbBuild(rows,prof,opt){opt=opt||{};var c=prof.cols,hdr=null,st=0,ci={},
  return{id:prof.id,name:prof.name,src:prof.src||prof.name,received:rcv,profile:prof.id,imported:new Date().toISOString(),sum:sum,offers:list}}
 /* storage: IndexedDB (a full vendor book is several MB — too big for localStorage); in-memory fallback */
 function pbDb(cb){var I=typeof indexedDB!=="undefined"?indexedDB:null;if(!I){cb(null);return}
- try{var q=I.open("tankering-pricebook",1);q.onupgradeneeded=function(){q.result.createObjectStore("vendors",{keyPath:"id"})};q.onsuccess=function(){cb(q.result)};q.onerror=function(){cb(null)}}catch(e){cb(null)}}
+ try{var q=I.open("tankering-pricebook",1);q.onupgradeneeded=function(){q.result.createObjectStore("vendors",{keyPath:"id"})};var once=false,ret=function(d){if(once)return;once=true;cb(d)};q.onsuccess=function(){var d=q.result;d.onversionchange=function(){try{d.close()}catch(x){}};ret(d)};q.onerror=function(){ret(null)};
+  q.onblocked=function(){ret(null)};setTimeout(function(){ret(null)},8000)}catch(e){cb(null)}}   // blocked upgrade (old tab open) / stuck open → in-memory fallback instead of hanging
 function pbIndex(){PB.idx={};PB.vendors.forEach(function(v){v.offers.forEach(function(o){(PB.idx[o.a]=PB.idx[o.a]||[]).push({v:v,o:o})})})}
 function pbLoad(cb){pbDb(function(db){if(!db){cb&&cb();return}try{var out=[],cur=db.transaction("vendors","readonly").objectStore("vendors").openCursor();
  cur.onsuccess=function(){var c=cur.result;if(c){out.push(c.value);c.continue()}else{var have={};PB.vendors.forEach(function(v){have[v.id]=1});HS.list=HS.list.concat(out.filter(function(v){return v.kind==="handling"&&!HS.list.some(function(x){return x.id===v.id})}));out=out.filter(function(v){return v.kind!=="handling"});PB.vendors=PB.vendors.concat(out.filter(function(v){return !have[v.id]}));pbIndex();pbRefreshLegs();cb&&cb()}};cur.onerror=function(){cb&&cb()}}catch(e){cb&&cb()}})}
@@ -814,40 +816,48 @@ function ghTok(){try{return localStorage.getItem(GH_KEY)||""}catch(e){return""}}
 function ghSetTok(v){try{if(v)localStorage.setItem(GH_KEY,v);else localStorage.removeItem(GH_KEY)}catch(e){}}
 function ghCfg(){var g=S.gh=S.gh||{};if(!g.repo)g.repo="adibiase/fuel-prices";if(!g.branch)g.branch="main";g.v=g.v||{};return g}
 function ghOnline(){return !(typeof navigator!=="undefined"&&navigator&&navigator.onLine===false)}
-function ghFetch(path,accept,cb,bin,hdrs){var g=ghCfg(),off={off:true,msg:"Offline or GitHub unreachable — using the prices saved on this device."};
+var GH_TIMEOUT_MS=20000,GH_CHECK_MS=120000;
+function ghFetch(path,accept,cb0,bin,hdrs){var g=ghCfg(),off={off:true,msg:"Offline or GitHub unreachable — using the prices saved on this device."},fired=false,tmr=null,ac=typeof AbortController==="function"?new AbortController():null;
+ var cb=function(e,d,m){if(fired)return;fired=true;if(tmr)clearTimeout(tmr);try{cb0(e,d,m)}catch(x){if(typeof console!=="undefined")console.error(x);try{cb0({status:0,msg:"App error while processing "+path.split("?")[0]+": "+(x&&x.message||x)},null)}catch(y){}}};
  if(typeof fetch!=="function"||!ghOnline()){cb(off);return}
  var sep=path.indexOf("?")>=0?"&":"?",url=GH_API+g.repo.replace(/^\/+|\/+$/g,"")+"/"+path+(/^(git\/|commits)/.test(path)?"":sep+"ref="+encodeURIComponent(g.branch));
  var hd={"Authorization":"Bearer "+ghTok(),"Accept":accept,"X-GitHub-Api-Version":"2022-11-28"};for(var hk in (hdrs||{}))hd[hk]=hdrs[hk];
- fetch(url,{headers:hd,cache:"no-store"}).then(function(r){var H=function(k){return r.headers&&r.headers.get?r.headers.get(k):null};
+ tmr=setTimeout(function(){if(ac)try{ac.abort()}catch(x){}cb({status:0,timeout:true,msg:"GitHub did not respond within "+GH_TIMEOUT_MS/1000+" s ("+path.split("?")[0]+") — check the connection and try again."})},GH_TIMEOUT_MS);if(tmr&&tmr.unref)tmr.unref();
+ fetch(url,ac?{headers:hd,cache:"no-store",signal:ac.signal}:{headers:hd,cache:"no-store"}).then(function(r){var H=function(k){return r.headers&&r.headers.get?r.headers.get(k):null};
   if(r.ok)return(/raw/.test(accept)?(bin?r.arrayBuffer():r.text()):r.json()).then(function(d){cb(null,d,{etag:H("etag")})});
   if(r.status===304){cb({status:304,msg:"not modified"});return}
   var rem=H("x-ratelimit-remaining"),rs=+H("x-ratelimit-reset");
   var m=r.status===401?"GitHub rejected the token (401): it is wrong or has expired. Create a new token and paste it here.":
-   r.status===404?"Not found (404): check the repo and branch names, and that the token was given access to this repo (Contents: Read-only).":
+   r.status===404?"Not found (404): the token cannot see "+g.repo+" (fine-grained tokens report missing repo access as 404) or the repo/branch name is wrong. Edit the token → Repository access → include "+g.repo.split("/").pop()+", Contents: Read.":
    (r.status===429||(r.status===403&&rem==="0"))?"GitHub rate limit reached"+(rs?" — try again after "+new Date(rs*1000).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"")+". Using the prices saved on this device.":
-   r.status===403?"Access denied (403): the token lacks Contents read permission for this repo.":"GitHub error "+r.status+".";
-  cb({status:r.status,msg:m,reset:(r.status===429||rem==="0")&&rs?rs:null})}).catch(function(){cb(off)})}
+   r.status===403?"Access denied (403): the token lacks Contents: Read permission for this repo, or the organisation has not approved it.":r.status>=500?"GitHub server error ("+r.status+") — try again shortly.":"GitHub error "+r.status+".";
+  cb({status:r.status,msg:m,reset:(r.status===429||rem==="0")&&rs?rs:null})}).catch(function(x){cb(x&&x.name==="AbortError"?{status:0,timeout:true,msg:"GitHub request timed out."}:off)})}
 function ghWhen(t){var d=new Date(t);return pbDTxt(d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate()))+" "+p2(d.getHours())+":"+p2(d.getMinutes())}
 /* list vendor folders: top-level dirs, each expected to hold latest.csv */
 function ghList(cb){ghFetch("contents/","application/vnd.github+json",function(e,d){var g=ghCfg();if(e){g.err=e.msg;cb&&cb(e);return}
  g.folders=(Array.isArray(d)?d:[]).filter(function(x){return x.type==="dir"&&x.name.charAt(0)!=="."}).map(function(x){return x.name});
  g.folders.forEach(function(f){if(!g.v[f])g.v[f]={on:true}});g.err=null;cb&&cb(null)})}
 /* check + download changed files, import through the profile pipeline */
-function ghSync(force,cb){var g=ghCfg();if(!ghTok()){g.err="Paste a GitHub token first.";cb&&cb();return}
- g.busy=true;ghList(function(e){if(e){g.busy=false;g.lastCheck=Date.now();cb&&cb();return}
-  var todo=g.folders.filter(function(f){return g.v[f].on}),log=[];
-  (function next(){if(!todo.length){g.busy=false;g.lastCheck=Date.now();g.msg=log.join(" · ");cb&&cb();return}var f=todo.shift(),gv=g.v[f];
-   ghFetch("contents/"+encodeURIComponent(f),"application/vnd.github+json",function(e,d){if(e){g.err=e.msg;log.push(f+": "+e.msg);next();return}
+function ghSync(force,cb1){var g=ghCfg();if(!ghTok()){g.err="Paste a GitHub token first.";cb1&&cb1();return}
+ var run=g.runId=(g.runId||0)+1,fin=false,wd=null,cb=function(){if(fin)return;fin=true;if(wd)clearTimeout(wd);if(g.runId===run)g.busy=false;cb1&&cb1()};
+ wd=setTimeout(function(){if(fin)return;g.err="Check timed out after "+GH_CHECK_MS/1000+" s"+(cur?" while loading "+cur+"/latest":"")+" — files already loaded were kept. Tap Refresh to try again.";g.msg=log.concat(cur?[cur+": timed out"]:[]).join(" · ");if(cur&&g.v[cur])g.v[cur].err="timed out";g.lastCheck=Date.now();cb()},GH_CHECK_MS);if(wd&&wd.unref)wd.unref();
+ var log=[],cur=null;g.err=null;
+ g.busy=true;ghList(function(e){if(fin)return;if(e){g.lastCheck=Date.now();cb();return}
+  var todo=g.folders.filter(function(f){return g.v[f].on});
+  (function next(){if(fin)return;if(!todo.length){cur=null;g.lastCheck=Date.now();g.msg=log.join(" · ");var bad=todo.length||Object.keys(g.v).filter(function(f){return g.v[f].on&&g.v[f].err});g.err=bad.length?"Some files did not load: "+bad.map(function(f){return f+" ("+g.v[f].err+")"}).join("; "):null;cb();return}var f=cur=todo.shift(),gv=g.v[f];
+   var fail=function(msg){gv.err=msg;log.push(f+": "+msg);next()};   // one bad file never blocks the others
+   ghFetch("contents/"+encodeURIComponent(f),"application/vnd.github+json",function(e,d){if(fin)return;if(e){fail(e.msg);return}
     var ent=(Array.isArray(d)?d:[]).filter(function(x){return x.type==="file"&&/^latest\.(csv|xlsx)$/i.test(x.name)})[0];
     if(!ent){gv.err="no latest.csv / latest.xlsx in "+f+"/";log.push(f+": no latest file");next();return}var bin=/\.xlsx$/i.test(ent.name);
     var have=PB.vendors.concat(HS.list).filter(function(v){return v.src&&v.src.path===f+"/"+ent.name&&v.src.sha===ent.sha})[0];
     if(!force&&have&&gv.sha===ent.sha){gv.checked=Date.now();gv.err=null;log.push(f+": unchanged");next();return}   // sha unchanged → skip download
     var dl=function(){ghFetch("contents/"+encodeURIComponent(f)+"/"+encodeURIComponent(ent.name),"application/vnd.github.raw",function(e,t){
      if(!e&&t&&(t.length||t.byteLength))return done(t);
-     if(e&&(e.status===401||e.off)){g.err=e.msg;log.push(f+": "+e.msg);next();return}
-     ghFetch("git/blobs/"+ent.sha,"application/vnd.github.raw",function(e2,t2){if(e2||!t2){g.err=(e2||{}).msg||"Download failed.";log.push(f+": download failed");next();return}done(t2)},bin)},bin)};
-    var done=function(data){fileRows(ent.name,data).then(function(rows){done2(rows)},function(er){gv.err=er.message;log.push(f+": "+er.message);next()})};
-    var done2=function(rows){if(ovDetect(rows)){ovLoadRows(rows,ent.sha);gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.name="Shared overrides";gv.err=null;g.err=null;log.push(f+": updated");next();return}
+     if(fin)return;if(e&&(e.status===401||e.off||e.timeout)){fail(e.msg);return}
+     ghFetch("git/blobs/"+ent.sha,"application/vnd.github.raw",function(e2,t2){if(fin)return;if(e2||!t2){fail((e2||{}).msg||"download failed");return}done(t2)},bin)},bin)};
+    var done=function(data){var rows;Promise.resolve().then(function(){return fileRows(ent.name,data)}).then(function(r){rows=r}).then(function(){if(fin)return;done2(rows)}).catch(function(er){if(fin)return;if(typeof console!=="undefined")console.error(er);fail("could not read "+f+"/"+ent.name+": "+(er&&er.message||er))})};
+    var done2=function(rows){if(f==="overrides"&&!ovDetect(rows)){var lk=pbDetect(rows);fail("overrides/latest.csv is not an overrides file"+(lk?" (it looks like a "+lk.name+" price file)":"")+" — not imported; put the overrides master (airport,fbo,aircraft,fuel_price,…) there");return}
+     if(ovDetect(rows)){ovLoadRows(rows,ent.sha);gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.name="Shared overrides";gv.err=null;g.err=null;log.push(f+": updated");next();return}
      var hv=importRows(rows,f+"/"+ent.name);if(hv){hv.src={gh:g.repo,branch:g.branch,path:f+"/"+ent.name,sha:ent.sha,at:Date.now()};hdlPut(hv);gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.profile="h_"+hv.prof;gv.name=hv.name;gv.err=null;g.err=null;log.push(f+": updated");next();return}
      var p=pbDetect(rows)||pbProfiles().filter(function(x){return x.id===gv.profile})[0];
      if(!p){PB.pending={rows:rows.slice(0,6),all:rows,ncol:Math.max.apply(null,rows.slice(0,30).map(function(r){return r.length}).concat([0])),file:"GitHub "+f+"/latest.csv",map:{},header:false,codeType:"auto",name:f,gh:{f:f,sha:ent.sha}};gv.err="layout not recognised — map the columns below";log.push(f+": needs column mapping");next();return}
@@ -874,7 +884,7 @@ function ghPoll(manual,cb){var g=ghCfg();if(!ghTok()){g.autoErr="Paste a GitHub 
    if(!gv){gv=g.v[f]={on:true}}if(gv.on&&gv.sha!==x.sha)ch.push(f)});
   g.folders=Object.keys(seen).sort();
   if(!ch.length){cb&&cb(false);return}
-  var t0=ghNow();ghSync(false,function(){var up=ch.filter(function(f){return g.v[f]&&g.v[f].at&&!g.v[f].err}).map(function(f){var gv=g.v[f],v=PB.vendors.concat(HS.list).filter(function(z){return z.src&&z.src.path&&z.src.path.indexOf(f+"/")===0})[0],dt=(v&&v.received)||gv.cdate||null;return (gv.name||f)+(dt?" ("+pbDTxt(dt,1)+")":"")});
+  var t0=ghNow();ghSync(false,function(){g.autoErr=g.err||null;var up=ch.filter(function(f){return g.v[f]&&g.v[f].at&&!g.v[f].err}).map(function(f){var gv=g.v[f],v=PB.vendors.concat(HS.list).filter(function(z){return z.src&&z.src.path&&z.src.path.indexOf(f+"/")===0})[0],dt=(v&&v.received)||gv.cdate||null;return (gv.name||f)+(dt?" ("+pbDTxt(dt,1)+")":"")});
    if(up.length){g.toast={msg:"Prices updated: "+up.join(" · ")+" · plan recalculated",at:ghNow()};g.updAt=ghNow();if(typeof setTimeout==="function"){var tt=setTimeout(function(){if(g.toast&&ghNow()-g.toast.at>=GH_TOAST_MS-50){g.toast=null;render()}},GH_TOAST_MS);if(tt&&tt.unref)tt.unref()}}
    cb&&cb(up.length>0)})},false,!manual&&g.etag?{"If-None-Match":g.etag}:null)}
 function ghToastHtml(){var g=ghCfg(),t=g.toast;if(!t||ghNow()-t.at>GH_TOAST_MS)return"";return '<div class="uptoast" role="status">✓ '+esc(t.msg)+' <button class="lk" id="toastx" aria-label="Dismiss">✕</button></div>'}
