@@ -499,7 +499,16 @@ var PB_BUILTIN=[{id:"worldfuel",name:"World Fuel",src:"World Fuel",builtin:true,
   cols:{code:"Airportcode",product:"Product",price:"CustomerOTDPrice"},info:{posted:"PostedOTDPrice",discount:"Discount"}},
  // Direct: the company's own direct contracts. ICAO preferred (IATA, then FAA fallback), min/max volume tiers, unit G/L, USD only, effective/expiration dates
  {id:"direct",name:"Direct",src:"Direct",builtin:true,header:true,codeType:"auto",direct:true,stripFbo:/^\s*direct\s*-\s*/i,
-  cols:{code:"ICAO",iata:"IATA",faa:"FAA",fbo:"FBO Name",country:"Country",product:"Fuel Type",min:"Minimum Volume",max:"Maximum Volume",unit:"Unit Type",price:"Price",currency:"Currency",eff:"Effective Date",date:"Expiration Date",notes:"Notes"}}];
+  cols:{code:"ICAO",iata:"IATA",faa:"FAA",fbo:"FBO Name",country:"Country",product:"Fuel Type",min:"Minimum Volume",max:"Maximum Volume",unit:"Unit Type",price:"Price",currency:"Currency",eff:"Effective Date",date:"Expiration Date",notes:"Notes"}},
+ // CAA (Corporate Aviation Association): header row, one row per airport+FBO, wide all-units tier columns "N - CAA Price 1-500" … "5501 or more" (tier min = first number);
+ // "0 - Jet A Retail" kept as reference only; price date comes from the file name (…-Prices-MM-DD-YYYY-H-MM-SS-AM.csv) when present
+ {id:"caa",name:"CAA",src:"CAA",builtin:true,header:true,codeType:"auto",country:"United States",received:true,staleDays:14,fileDate:true,
+  cols:{code:"Airport Identifier",fbo:"FBO Name"},tierRe:/\bcaa\s+price\s+([\d,]+)/i,info:{posted:"0 - Jet A Retail"}},
+ // Signature fuel prices (not the handling schedule): Base (IATA/FAA, may carry a Signature location suffix e.g. DAL2), Tail Number, Min/Max Quantity tiers, Total $/gal.
+ // FBO is always Signature, so picking it still triggers the Signature handling-schedule auto-fill. 999999 max = open-ended.
+ {id:"sigfuel",name:"Signature",src:"Signature",builtin:true,header:true,codeType:"auto",country:"United States",fbo:"Signature Flight Support",baseSuffix:true,received:true,staleDays:14,
+  cols:{code:"Base",tail:"Tail Number",min:"Min Quantity",max:"Max Quantity",price:"Total"}}];
+function pbFileDate(f){var m=String(f||"").match(/(\d{1,2})-(\d{1,2})-(\d{4})(?:-(\d{1,2})-(\d{2})-(\d{2})-?(AM|PM)?)?/i);if(!m||+m[1]>12||+m[2]>31)return null;return m[3]+"-"+p2(+m[1])+"-"+p2(+m[2])}
 var L_PER_GAL=3.78541;
 function p2(n){return (n<10?"0":"")+n}
 function pbToday(){if(PB_TODAY)return PB_TODAY;var d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())}
@@ -532,23 +541,28 @@ function pbResolve(code,country,type,soft){code=String(code||"").replace(/\s+/g,
  return q||k}
 function pbProfiles(){return PB_BUILTIN.concat(S.pbProfiles||[])}
 function pbDetect(rows){var s=rows.slice(0,30).filter(function(r){return r.length>1});if(!s.length)return null;
- return pbProfiles().filter(function(p){var c=p.cols,b=p.header?s.slice(1):s;if(p.header){var h=s[0].map(function(x){return String(x).trim().toLowerCase()});return Object.keys(c).every(function(k){return typeof c[k]!=="string"||h.indexOf(c[k].toLowerCase())>=0})&&b.length>0}
+ return pbProfiles().filter(function(p){var c=p.cols,b=p.header?s.slice(1):s;if(p.header){var h=s[0].map(function(x){return String(x).trim().toLowerCase()});return Object.keys(c).every(function(k){return typeof c[k]!=="string"||h.indexOf(c[k].toLowerCase())>=0})&&(!p.tierRe||h.some(function(x){return p.tierRe.test(x)}))&&b.length>0}
   var good=b.filter(function(r){return (!p.ncol||r.length===p.ncol)&&isFinite(pbNum(r[c.price]))&&(c.min==null||isFinite(pbNum(r[c.min])))&&(c.date==null||!!pbDate(r[c.date]))}).length;return (!p.ncol||b.every(function(r){return r.length===p.ncol}))&&good>=Math.max(1,Math.ceil(b.length*0.8))})[0]||null}
 function pbBuild(rows,prof,opt){opt=opt||{};var c=prof.cols,hdr=null,st=0,ci={},k,ii={},rcv=prof.received?(opt.received||pbToday()):null;
  if(prof.header){hdr=(rows[0]||[]).map(function(x){return String(x).trim().toLowerCase()});st=1}
  var col=function(v){return typeof v==="number"?v:(hdr?hdr.indexOf(String(v).trim().toLowerCase()):-1)};for(k in c)ci[k]=col(c[k]);for(k in (prof.info||{}))ii[k]=col(prof.info[k]);
+ if(prof.tierRe&&hdr){var tc=[];hdr.forEach(function(h,j){var m=h.match(prof.tierRe);if(m)tc.push([j,pbNum(m[1])])});var src=0,nr=[],W=hdr.length;   // wide tier columns → one row per non-blank numeric tier cell
+  rows.slice(st).forEach(function(r){if(!r||r.length<2)return;src++;var any=false;tc.forEach(function(t){var v=String(r[t[0]]==null?"":r[t[0]]).trim();if(v===""||!isFinite(pbNum(v)))return;any=true;nr.push(r.slice(0,W).concat([t[1],v],[src]))});if(!any)nr.push(r.slice(0,W).concat(["",""],[src]))});
+  rows=[rows[0]].concat(nr);ci.min=W;ci.price=W+1;var tierSrc=W+2}
  var g=function(r,f){var j=ci[f];return j!=null&&j>=0&&r[j]!=null?String(r[j]).trim():""},hasC=ci.country!=null&&ci.country>=0;
  var off={},sum={rows:0,imported:0,cfp:0,bad:0,unknown:0,unk:{},expired:0,additive:0,cur:0},td=pbToday();
- for(var i=st;i<rows.length;i++){var r=rows[i];if(!r||r.length<2)continue;sum.rows++;
+ for(var i=st;i<rows.length;i++){var r=rows[i];if(!r||r.length<2)continue;if(tierSrc==null||r[tierSrc]!==(rows[i-1]||[])[tierSrc])sum.rows++;
   var pr=pbNum(g(r,"price")),cu=g(r,"currency").toUpperCase(),un=g(r,"unit").toUpperCase(),lit=/^L/.test(un);
   if(cu&&cu!=="USD"){sum.cur=(sum.cur||0)+1;(sum.curs=sum.curs||{})[cu]=1;continue}   // currency not supported (USD only)
   if(lit)pr*=L_PER_GAL;                                                                // $/litre → $/US gal
   if(pr>=9999){sum.cfp++;continue}if(!(pr>0&&pr<100)){sum.bad++;continue}
   var cty=hasC?g(r,"country")||"?":(prof.country||null),code=g(r,"code").toUpperCase(),ic=pbResolve(code,cty,prof.codeType,!hasC&&!!prof.country);
+  var sfx="";if(!ic&&prof.baseSuffix){var bm=code.match(/^([A-Z0-9]{3})(\d)$/);if(bm){ic=pbResolve(bm[1],cty,prof.codeType,!hasC&&!!prof.country);if(ic)sfx=code}}
+  if(g(r,"tail"))sfx+=" · tail "+g(r,"tail").toUpperCase();
   if(!ic&&ci.iata>=0&&g(r,"iata")){var c2=g(r,"iata").toUpperCase();ic=pbResolve(c2,cty,"auto");if(!code)code=c2}
   if(!ic&&ci.faa>=0&&g(r,"faa")){var c3=g(r,"faa").toUpperCase();ic=pbResolve(c3,cty,"auto");if(!code)code=c3}
-  if(!ic){sum.unknown++;sum.unk[code||"(blank)"]=(sum.unk[code||"(blank)"]||0)+1;continue}
-  var notes=g(r,"notes"),prod=pbProdNorm(g(r,"product")||pbProduct(notes)),add=/ADDITIVE/.test(prod),fraw=g(r,"fbo"),fb=prof.fbo||(prof.stripFbo?fraw.replace(prof.stripFbo,"").trim()||fraw:pbFboName(fraw))||"(FBO not given)",mn=pbNum(g(r,"min")),mx=pbNum(g(r,"max")),ef=pbDate(g(r,"eff")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
+  if(!ic){if(tierSrc!=null&&(rows[i-1]||[])[tierSrc]===r[tierSrc])continue;sum.unknown++;sum.unk[code||"(blank)"]=(sum.unk[code||"(blank)"]||0)+1;continue}
+  var notes=g(r,"notes"),prod=pbProdNorm(g(r,"product")||pbProduct(notes)),add=/ADDITIVE/.test(prod),fraw=g(r,"fbo"),fb=prof.fbo?(/^[A-Z0-9]{4}$/.test(sfx.split(" ")[0])?"Signature "+sfx:prof.fbo+sfx):(prof.stripFbo?fraw.replace(prof.stripFbo,"").trim()||fraw:pbFboName(fraw))||"(FBO not given)",mn=pbNum(g(r,"min")),mx=pbNum(g(r,"max"));if(mx>=99999)mx=0;var ef=pbDate(g(r,"eff")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
   if(!(mn>=0))mn=0;if(lit){mn/=L_PER_GAL;if(mx>0)mx/=L_PER_GAL}
   if(!o){o=off[key]={a:ic,c:code,f:fb,p:prod,x:add,d:prof.received?null:d,t:[],fe:pbFees(notes)};if(prof.stripFbo&&fraw!==fb)o.fn=fraw;if(prof.direct){o.dir=1;if(notes)o.note=notes}if(rcv){o.r=rcv;o.sd=prof.staleDays||14}
    var inf={},hi=false;for(var q in ii)if(ii[q]>=0&&r[ii[q]]!=null&&String(r[ii[q]]).trim()!==""){inf[q]=pbNum(r[ii[q]]);hi=true}if(hi)o.info=inf}
@@ -625,7 +639,7 @@ function pbSection(){var nA=Object.keys(PB.idx).length,h='<h2><button class="set
  return h+'</div>'}
 function pbHandleText(text,file,cb){pbHandleRows(csvParse(text),file,cb)}
 function pbHandleRows(rows,file,cb){PB.err=null;PB.last=null;PB.pending=null;HS.last=null;if(importRows(rows,file,function(){cb&&cb()}))return;if(!rows.length){PB.err="That file is empty.";cb&&cb();return}
- var p=pbDetect(rows);if(p){var v=pbBuild(rows,p);v.file=file||"";PB.last=v;pbPut(v,cb);return}
+ var p=pbDetect(rows);if(p){var v=pbBuild(rows,p,{received:p.fileDate?pbFileDate(file):null});v.file=file||"";PB.last=v;pbPut(v,cb);return}
  var n=0;rows.slice(0,30).forEach(function(r){n=Math.max(n,r.length)});PB.pending={rows:rows.slice(0,6),all:rows,ncol:n,file:file,map:{},header:false,codeType:"auto",name:""};cb&&cb()}
 function pbSaveMap(){var P=PB.pending,cols={};for(var c in P.map)if(P.map[c]&&P.map[c]!=="ignore")cols[P.map[c]]=P.header?String(P.all[0][c]||"").trim():+c;
  if(cols.code==null||cols.price==null){PB.err="Pick at least the Airport and Price columns.";return false}
