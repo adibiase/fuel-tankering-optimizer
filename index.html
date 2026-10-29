@@ -519,7 +519,12 @@ var PB_BUILTIN=[{id:"worldfuel",name:"World Fuel",src:"World Fuel",builtin:true,
  // Signature fuel prices (not the handling schedule): Base (IATA/FAA, may carry a Signature location suffix e.g. DAL2), Tail Number, Min/Max Quantity tiers, Total $/gal.
  // FBO is always Signature, so picking it still triggers the Signature handling-schedule auto-fill. 999999 max = open-ended.
  {id:"sigfuel",name:"Signature",src:"Signature",builtin:true,header:true,codeType:"auto",country:"United States",fbo:"Signature Flight Support",baseSuffix:true,received:true,staleDays:14,
-  cols:{code:"Base",tail:"Tail Number",min:"Min Quantity",max:"Max Quantity",price:"Total"}}];
+  cols:{code:"Base",tail:"Tail Number",min:"Min Quantity",max:"Max Quantity",price:"Total"}},
+ // Jet Aviation: ICAO,Volume Tier,Product,Price,Tail Numbers. Blank ICAO = same airport as the row above (carried down); product trimmed, Jet A only
+ // (SAF kept as a reference note, never priced); tiers "1+", "1 - 500", "1,001+" → tier min = first number (ranges may overlap/gap); "All Tails" = every aircraft
+ {id:"jetaviation",name:"Jet Aviation",src:"Jet Aviation",builtin:true,header:true,codeType:"auto",country:"United States",fbo:"Jet Aviation",received:true,staleDays:14,carry:true,
+  cols:{code:"ICAO",tier:"Volume Tier",product:"Product",price:"Price",tail:"Tail Numbers"}}];
+function jaTier(s){var m=String(s==null?"":s).replace(/[,\s"]/g,"").match(/^(\d+)(?:\+|-(\d+))?$/);return m?[+m[1],m[2]!=null?+m[2]:0]:null}
 function pbFileDate(f){var m=String(f||"").match(/(\d{1,2})-(\d{1,2})-(\d{4})(?:-(\d{1,2})-(\d{2})-(\d{2})-?(AM|PM)?)?/i);if(!m||+m[1]>12||+m[2]>31)return null;return m[3]+"-"+p2(+m[1])+"-"+p2(+m[2])}
 var L_PER_GAL=3.78541;
 function p2(n){return (n<10?"0":"")+n}
@@ -561,6 +566,10 @@ function pbBuild(rows,prof,opt){opt=opt||{};var c=prof.cols,hdr=null,st=0,ci={},
  if(prof.tierRe&&hdr){var tc=[];hdr.forEach(function(h,j){var m=h.match(prof.tierRe);if(m)tc.push([j,pbNum(m[1])])});var src=0,nr=[],W=hdr.length;   // wide tier columns → one row per non-blank numeric tier cell
   rows.slice(st).forEach(function(r){if(!r||r.length<2)return;src++;var any=false;tc.forEach(function(t){var v=String(r[t[0]]==null?"":r[t[0]]).trim();if(v===""||!isFinite(pbNum(v)))return;any=true;nr.push(r.slice(0,W).concat([t[1],v],[src]))});if(!any)nr.push(r.slice(0,W).concat(["",""],[src]))});
   rows=[rows[0]].concat(nr);ci.min=W;ci.price=W+1;var tierSrc=W+2}
+ if(prof.carry&&hdr){var W2=hdr.length,cc="",nr3=[],saf={},safN=0;rows.slice(st).forEach(function(r){if(!r||r.length<2)return;r=r.slice(0,W2);while(r.length<W2)r.push("");   // Jet Aviation: carry ICAO down, Jet A only, parse tier text
+   var cd=String(r[ci.code]||"").trim();if(cd)cc=cd;else r[ci.code]=cc;var pd=String(r[ci.product]||"").trim();r[ci.product]=pd;var tr=jaTier(r[ci.tier]),tl=String(r[ci.tail]||"").trim();if(/^all\s*tails?$/i.test(tl))tl="";
+   if(!/^jet\s*-?\s*a1?$/i.test(pd)){safN++;var p0=pbNum(r[ci.price]);if(/^saf$/i.test(pd)&&p0>0&&tr){var sk=cc.toUpperCase()+"|"+tl.toUpperCase();if(!saf[sk]||tr[0]<saf[sk][0])saf[sk]=[tr[0],p0]}return}
+   nr3.push(r.concat([tr?tr[0]:"",tr&&tr[1]?tr[1]:"",tl]))});rows=[rows[0]].concat(nr3);ci.min=W2;ci.tmax=W2+1;ci.tail=W2+2}
  var g=function(r,f){var j=ci[f];return j!=null&&j>=0&&r[j]!=null?String(r[j]).trim():""},hasC=ci.country!=null&&ci.country>=0;
  var bcodes={};if(prof.baseSuffix)rows.slice(st).forEach(function(r){if(r&&ci.code>=0)bcodes[String(r[ci.code]||"").trim().toUpperCase()]=1});
  var off={},sum={rows:0,imported:0,cfp:0,bad:0,unknown:0,unk:{},expired:0,additive:0,cur:0},td=pbToday();
@@ -583,6 +592,7 @@ function pbBuild(rows,prof,opt){opt=opt||{};var c=prof.cols,hdr=null,st=0,ci={},
   var dup=o.t.filter(function(t){return t[0]===mn})[0];if(dup){if(pr<dup[1]){dup[1]=pr;if(mx>0)dup[2]=mx}}else o.t.push(mx>0?[mn,pr,mx]:[mn,pr]);
   if(!prof.received&&d&&(!o.d||d<o.d))o.d=d;sum.imported++;if(!prof.received&&d&&d<td)sum.expired++;if(add)sum.additive++}
  var list=Object.keys(off).map(function(k){var o=off[k];o.t.sort(function(a,b){return a[0]-b[0]});return o}),ap={};
+ if(prof.carry){sum.ref=safN;list.forEach(function(o){var tl=(o.f.match(/ · tail (.+)$/)||[])[1]||"",s=saf[String(o.c).toUpperCase()+"|"+tl],n=[];if(tl)n.push("Tail-specific price ("+tl+") — check it applies to this aircraft");if(s)n.push("SAF $"+s[1].toFixed(2)+"/gal reference only, not used");if(n.length)o.note=n.join(" · ")})}
  list.forEach(function(o){ap[o.a]=1});sum.airports=Object.keys(ap).length;sum.offers=list.length;
  var fb={};list.forEach(function(o){fb[o.a+"|"+o.f]=1});sum.fbos=Object.keys(fb).length;
  sum.expOffers=list.filter(function(o){return o.d&&o.d<td}).length;sum.resolved={};list.forEach(function(o){sum.resolved[o.c]=o.a});
