@@ -272,7 +272,7 @@ function fqT(g,d){return gal(g,d)+' gal · '+gal(g*dens())+' lb'}
 function gal(v,d){return (+v).toLocaleString("en-US",{minimumFractionDigits:d||0,maximumFractionDigits:d||0})}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function num(v){var x=parseFloat(v);return isNaN(x)?0:x}
-function legFbo(l){var f={apt:l.from,name:"",active:true,price:num(l.price),fee:num(l.fee),waiver:num(l.waiver),noWaiver:!!(l.noWaiver&&!l.waiverManual)};if(l.pb&&l.pb.t&&l.pb.t.length){f.tiers=l.pb.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]});f.price=f.tiers[0][1];f.name=l.pb.f}return f}
+function legFbo(l){var f={apt:l.from,name:"",active:true,price:num(l.price),fee:num(l.fee),waiver:num(l.waiver),noWaiver:!!(l.noWaiver&&!l.waiverManual)||blank(l.waiver)};if(l.pb&&l.pb.t&&l.pb.t.length){f.tiers=l.pb.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]});f.price=f.tiers[0][1];f.name=l.pb.f}return f}
 function buildInp(mod){mod=mod||{};var a=S.aircraft[S.ac]||S.aircraft[0],rm=mod.rateMul||1;
  return{aircraft:{rate:num(a.rate)*rm,cap:num(a.cap),res:num(a.resLb)/dens(),burn:num(a.burn),bow:num(a.bow),ramp:num(a.ramp),mtow:num(a.mtow),mlw:num(a.mlw),payload:num(a.payload),taxi:num(a.taxi),dens:dens()},
  fbos:S.legs.map(function(l,i){var f=legFbo(l);if(mod.pm){var m=mod.pm(i);f.price*=m;if(f.tiers)f.tiers.forEach(function(t){t[1]*=m})}if(mod.add&&mod.add.i===i){f.price+=mod.add.d;if(f.tiers)f.tiers.forEach(function(t){t[1]+=mod.add.d})}return f}),
@@ -579,11 +579,14 @@ function pbProvOf(pb){if(!pb)return"";if(pb.prov)return pb.prov;var v=PB.vendors
 function pbTrunc(s,n){return s.length>n?s.slice(0,n-1)+"…":s}
 function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return pbProv(e.v)+" · "+pbTrunc(o.f,24)+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(o.d&&o.d<pbToday()?" · expired":"")+(o.ef&&o.ef>pbToday()?" · from "+pbDTxt(o.ef,1):"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
 function pbSnap(e){return{k:pbKey(e),v:e.v.src||e.v.name,prov:pbProv(e.v),vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,fn:e.o.fn||null,note:e.o.note||null,ef:e.o.ef||null,dir:e.o.dir||0,lit:e.o.lit||0,t:e.o.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]}),fe:e.o.fe}}
-function pbPick(i,key){var l=S.legs[i];if(!l)return;if(!key||key==="manual"){delete l.pb;return}
+function pbPick(i,key){var l=S.legs[i];if(!l)return;
+ var wasSched=!!(l.hdl&&l.hdl.st==="ok"),clr=function(){l.fee="";l.waiver="";l.noWaiver=false;l.feeManual=l.waiverManual=false;delete l.hdl};
+ if(!key||key==="manual"){delete l.pb;if(wasSched)clr();return}                         // leaving Signature → blank fee + waiver
  var e=pbOffers(l.from).concat(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===key})[0];if(!e)return;l.pb=pbSnap(e);l.price=l.pb.t[0][1];
- var m=(S.fboMem||{})[l.from+"|"+e.o.f];if(m){l.fee=m.fee;l.waiver=m.waiver}}
+ var sig=!!hdlFor(l);if(wasSched)clr();if(sig){l.feeManual=l.waiverManual=false}        // (back) to Signature → schedule values, auto (overrides dropped)
+ var m=(S.fboMem||{})[l.from+"|"+e.o.f];if(m){l.fee=m.fee;l.waiver=m.waiver}}   // remembered per airport+FBO values (schedule values win at covered Signature locations)
 function pbRefreshLegs(){S.legs.forEach(function(l){if(!l.pb)return;var e=(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===l.pb.k})[0];if(e){l.pb=pbSnap(e);l.price=l.pb.t[0][1]}})}
-function pbMem(l){if(!l.pb)return;S.fboMem=S.fboMem||{};S.fboMem[l.from+"|"+l.pb.f]={fee:l.fee,waiver:l.waiver}}
+function pbMem(l){if(!l.pb||(l.hdl&&l.hdl.st==="ok"))return;S.fboMem=S.fboMem||{};S.fboMem[l.from+"|"+l.pb.f]={fee:l.fee,waiver:l.waiver}}
 var TIER_TIP="Tier pricing (all-units): the total gallons you buy at a stop pick the tier, and the whole uplift is charged at that tier’s price. Example: tiers 1+ $6.58 and 2,001+ $6.28 — buying 2,001 gal costs 2,001 × $6.28. The optimizer also tries buying up to the next tier break when that is cheaper overall (within max fuel and weight limits).";
 function pbLegHtml(l,i){var of=pbOffers(l.from),cur=l.pb;if(!of.length&&!cur)return"";var multi=PB.vendors.length>1,ex=cur&&cur.d&&cur.d<pbToday();
  var h='<div class="pbleg"><label>Contract FBO at '+esc(l.from)+' <span class="info" title="'+esc(TIER_TIP)+'">ⓘ</span></label><select data-pb="'+i+'"><option value="manual">Manual price</option>';
