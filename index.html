@@ -72,7 +72,7 @@ body.desk main{max-width:1440px;padding:16px 24px}
 label.nw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lsub{font-size:.8em;font-weight:400;opacity:.75;letter-spacing:0;text-transform:none}
 .ghs{margin:4px 0 8px;padding:10px 0;border-bottom:1px solid var(--bd)}.ghst{font-size:12.5px;color:var(--ok);margin:4px 0;word-break:break-word}.ghtok{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center}.ghtok .btn{margin:0;padding-left:10px;padding-right:10px}.ghhelp ol{padding-left:18px;margin:6px 0}.ghhelp code{font-size:11.5px}
 .pbleg{margin-top:8px}.pbleg select{width:100%}.info{cursor:help;color:var(--t2);font-weight:400}.tg.exp{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--tx);border-color:var(--warn)}.pbl{font-size:12.5px;margin:4px 0 0;font-weight:600}.pbv{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}.pbv .btn{flex:none;margin:0}.pbsum{margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)}.pbsum .kv{font-size:13px}.codes{word-break:break-word}.pbmap{margin-top:10px}.pbmap .tw{overflow-x:auto}.pbmap table{border-collapse:collapse;font-size:12px}.pbmap td{border-bottom:1px solid var(--bd);padding:3px 4px;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}.pbmap th select{font-size:12px;padding:2px}.cnt{font-size:11px;font-weight:400;color:var(--t2);margin-left:6px;text-transform:none;letter-spacing:0}
-.dnote{margin:6px 0 2px;font-size:13px;line-height:1.4;color:var(--tx)}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:1px}.rtab tr.nrow td{text-align:left!important;padding-top:0}.rtab tr:has(+tr.nrow) td{border-bottom:0}.card.close div+div{margin-top:6px}
+.tg.dir{background:color-mix(in srgb,var(--ok,#1a7f37) 16%,transparent);border-color:color-mix(in srgb,var(--ok,#1a7f37) 55%,transparent);color:var(--tx);font-size:11px}.ch .lbl{paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;font-weight:600}.ch .wlt{fill:var(--c-lim)}.ch .mint{fill:var(--warn)}.ln.wl{border-color:var(--c-lim)}.dnote{margin:6px 0 2px;font-size:13px;line-height:1.4;color:var(--tx)}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:1px}.rtab tr.nrow td{text-align:left!important;padding-top:0}.rtab tr:has(+tr.nrow) td{border-bottom:0}.card.close div+div{margin-top:6px}
 .rtab tr.wrow td{font-size:11.5px;color:var(--t2);text-align:left;padding-top:0;white-space:nowrap}.rtab tr:has(+tr.wrow) td{border-bottom:0}
 </style></head><body><main id="app"></main><div class="toast" id="toast"></div><div class="sticky"><div class="in" id="bar"></div></div>
 <script>/* Airport data: OurAirports (public domain), ICAO,lat,lon,name */
@@ -97,8 +97,10 @@ function optimize(inp){
     var res=(g.reserve!==null&&g.reserve!==undefined&&g.reserve!=="")?+g.reserve:ac.res;
     var lg={i:i,from:g.from,to:g.to,h:g.hours,trip:trip,res:res,p:F.price,fee:F.fee,w:F.waiver,k:ac.rate*g.hours,fbo:F,cap:cap,lim:null};
     // optional tier ladder (all-units): [[minGal,price],...] ascending; the uplift's total gallons pick ONE price for the whole uplift
-    if(F.tiers&&F.tiers.length>1){lg.tiers=F.tiers.slice().sort(function(a,b){return a[0]-b[0]});lg.p=lg.tiers[0][1];
-      lg.bps=lg.tiers.slice(1).map(function(t){return Math.ceil(t[0]-1e-9)});}
+    // a tier may carry a max volume [min,price,max]: it doesn't apply above max; gaps are skipped by buying up to the next tier; above the highest max the uplift is capped
+    if(F.tiers&&(F.tiers.length>1||F.tiers.some(function(t){return t[2]>0}))){lg.tiers=F.tiers.slice().sort(function(a,b){return a[0]-b[0]});lg.p=lg.tiers[0][1];
+      lg.bps=lg.tiers.slice(1).map(function(t){return Math.ceil(t[0]-1e-9)});
+      if(lg.tiers.every(function(t){return t[2]>0}))lg.umax=Math.floor(Math.max.apply(null,lg.tiers.map(function(t){return t[2]}))+1e-9);}
     // optional weight limits (lb) -> per-leg max departure fuel (gal); blank/0 = off
     var dn=ac.dens||6.7,bow=+ac.bow||0,pl=(g.payload!=null&&g.payload!==""&&!isNaN(+g.payload))?+g.payload:(+ac.payload||0);
     if(bow>0){lg.bow=bow;lg.payload=pl;lg.dens=dn;var lims=[];
@@ -122,8 +124,9 @@ function optimize(inp){
     S[i][j]=l.trip+(Math.max(l.res,nx)-l.k*l.res)/(1-l.k);}
   out.depReq=L.map(function(l,i){return T[i][n-1];});
   out.arrReq=L.map(function(l,i){return i===n-1?l.res:Math.max(l.res,T[i+1][n-1]);});
-  function tierOf(l,u){if(!l.tiers)return -1;var k=0;for(var t=1;t<l.tiers.length;t++)if(u>=l.tiers[t][0]-1e-9)k=t;return k}
-  function pr(l,u){var k=tierOf(l,u);return k<0?l.p:l.tiers[k][1]}
+  function tierOf(l,u){if(!l.tiers)return -1;var k=-1;for(var t=0;t<l.tiers.length;t++){var x=l.tiers[t];if((t===0||u>=x[0]-1e-9)&&!(x[2]>0&&u>x[2]+1e-9))k=t}return k}
+  function gapUp(l,u){for(var t=0;t<l.tiers.length;t++){var m=Math.ceil(l.tiers[t][0]-1e-9);if(m>u&&tierOf(l,m)>=0)return m}return null} // next tier start above a gap
+  function pr(l,u){var k=tierOf(l,u);return k<0?(l.tiers?l.tiers[l.tiers.length-1][1]:l.p):l.tiers[k][1]}
   // tier bump options per stop; trimmed (latest stops first) so the search stays under TIER_BUDGET plans
   var NB=L.map(function(l){return l.bps?Math.min(TIER_BUMPS,l.bps.length):0}),base0=1,tot;for(var q=0;q<n;q++)base0*=2+(n-1-q);
   for(;;){tot=base0;NB.forEach(function(b){tot*=1+b});if(tot<=TIER_BUDGET)break;var mi=-1;for(q=n-1;q>=0;q--)if(NB[q]>0&&(mi<0||NB[q]>NB[mi]))mi=q;if(mi<0)break;NB[mi]--}
@@ -132,12 +135,13 @@ function optimize(inp){
     var A=A0,cost=0,ok=A0<=cap+1e-6,rows=[];
     for(var i=0;i<n;i++){var l=L[i],mind=l.trip+l.res,c=choice[i],x;
       x=c===0?mind-A:(c===1?Math.max(mind-A,l.w):S[i][i+c-1]-A);
-      var um=l.lim?Math.floor(l.cap-A+1e-6):l.cap-A,u=Math.max(0,Math.min(um,Math.ceil(x-1e-6))),bump=false;
+      var um=l.lim?Math.floor(l.cap-A+1e-6):l.cap-A,capd=false;if(l.umax!=null&&l.umax<um){um=l.umax;capd=Math.ceil(x-1e-6)>l.umax}var u=Math.max(0,Math.min(um,Math.ceil(x-1e-6))),bump=false,gap=false;
       if(bm&&bm[i]>0){var up=l.bps.filter(function(b){return b>u});var tg=up[bm[i]-1];if(tg==null||tg>um+1e-6)return {ok:false,rows:[]};u=tg;bump=true}
+      if(l.tiers&&u>0&&tierOf(l,u)<0){var gu=gapUp(l,u);if(gu==null||gu>um+1e-6)return {ok:false,rows:[]};u=gu;bump=gap=true}
       var D=A+u, pen=l.k*Math.max(0,D-mind), An=D-l.trip-pen, fee=feeOf(l,u);
       ok=ok&&D<=l.cap+0.01&&An>=l.res-0.01;
       var tp=pr(l,u);cost+=u*tp+fee;
-      rows.push({arrBefore:A,u:u,dep:D,pen:pen,arr:An,fee:fee,c:c,fuel:u*tp,tp:tp,ti:tierOf(l,u),bump:bump});
+      rows.push({arrBefore:A,u:u,dep:D,pen:pen,arr:An,fee:fee,c:c,fuel:u*tp,tp:tp,ti:tierOf(l,u),bump:bump,gap:gap,capMax:capd?l.umax:null});
       A=An;}
     var obj=cost-credit*Math.max(0,A-L[n-1].res);
     return {cost:cost,obj:obj,ok:ok,rows:rows};}
@@ -148,18 +152,21 @@ function optimize(inp){
   out.combos=count;
   // baseline: need-only, pay every fee; alt: fee waived where need>=waiver
   var A=A0,base=0,alt=0,bu=[];
-  for(i=0;i<n;i++){var l=L[i],mind=l.trip+l.res,u=Math.max(0,Math.min(l.lim?Math.floor(l.cap-A+1e-6):l.cap-A,Math.ceil(mind-A-1e-6)));
+  for(i=0;i<n;i++){var l=L[i],mind=l.trip+l.res,u=Math.max(0,Math.min(l.lim?Math.floor(l.cap-A+1e-6):l.cap-A,l.umax!=null?l.umax:Infinity,Math.ceil(mind-A-1e-6)));if(l.tiers&&u>0&&tierOf(l,u)<0){var gu=gapUp(l,u);if(gu!=null)u=gu}
     bu.push(u);base+=u*pr(l,u)+l.fee;alt+=u*pr(l,u)+(u>0&&u>=l.w?0:(u===0?l.fee*cz:l.fee));
     var D=A+u;A=D-l.trip-l.k*Math.max(0,D-mind);}
   out.baseline=base;out.alt=alt;out.baseUplift=bu;
-  if(bad.length||!best){out.infeasible=true;out.reason=bad.length?bad.map(function(l){return "Leg "+(l.i+1)+(l.lim?": Over "+l.lim+" — trip + reserve exceeds the weight-limited fuel ("+Math.floor(l.cap)+" gal); reduce payload or add a stop":": trip + reserve exceeds max usable fuel")}).join("; "):"No feasible plan";return out;}
+  if(bad.length||!best){out.infeasible=true;out.reason=bad.length?bad.map(function(l){return "Leg "+(l.i+1)+(l.lim?": Over "+l.lim+" — trip + reserve exceeds the weight-limited fuel ("+Math.floor(l.cap)+" gal); reduce payload or add a stop":": trip + reserve exceeds max usable fuel")}).join("; "):"No feasible plan"+(L.some(function(l){return l.umax!=null})?" — a contract max volume ("+L.filter(function(l){return l.umax!=null}).map(function(l){return l.from+" "+l.umax.toLocaleString("en-US")+" gal"}).join(", ")+") may be too low for the fuel needed":"");return out;}
   best.rows.forEach(function(r,i){var l=L[i];
     var d; if(r.u===0)d="Buy 0 – use tankered fuel"; else if(r.dep>=l.cap-0.5)d=l.lim?"Fill to "+l.lim+" limit (tanker)":"Fill to max (tanker)";
+    else if(r.capMax!=null)d="Buy contract max ("+r.capMax.toLocaleString("en-US")+" gal)";
+    else if(r.gap)d="Buy up to "+r.u.toLocaleString("en-US")+" gal (tier gap)";
     else if(r.bump)d="Buy up to "+r.u.toLocaleString("en-US")+" gal price tier";
     else if(r.c===0)d=r.u>=l.w?"Buy need only (fee waived)":"Buy need only";
     else if(r.c===1)d=r.u<=l.w+0.5?"Buy waiver min":"Buy need only";
     else{var t=Math.min(i+r.c,n);d=t>=n?"Tanker thru end of trip":"Tanker thru leg "+t;}
     r.decision=d; r.wlim=(l.lim&&r.dep>=l.cap-0.5)?l.lim:null; r.eff=r.u>0?(r.fuel+r.fee)/r.u:null; r.stop=r.fuel+r.fee;});
+  best.rows.forEach(function(r,i){if(r.capMax!=null)warn.push("Leg "+(i+1)+": uplift at "+L[i].from+" capped at the contract max volume ("+r.capMax.toLocaleString("en-US")+" gal)")});
   out.opt=best.cost;out.obj=best.obj;out.rows=best.rows;out.savings=base-best.obj;out.savPct=base?out.savings/base:0;
   out.altSavings=alt-best.obj;
   return out;}
@@ -265,7 +272,7 @@ function fqT(g,d){return gal(g,d)+' gal · '+gal(g*dens())+' lb'}
 function gal(v,d){return (+v).toLocaleString("en-US",{minimumFractionDigits:d||0,maximumFractionDigits:d||0})}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function num(v){var x=parseFloat(v);return isNaN(x)?0:x}
-function legFbo(l){var f={apt:l.from,name:"",active:true,price:num(l.price),fee:num(l.fee),waiver:num(l.waiver)};if(l.pb&&l.pb.t&&l.pb.t.length){f.tiers=l.pb.t.map(function(t){return[t[0],t[1]]});f.price=f.tiers[0][1];f.name=l.pb.f}return f}
+function legFbo(l){var f={apt:l.from,name:"",active:true,price:num(l.price),fee:num(l.fee),waiver:num(l.waiver)};if(l.pb&&l.pb.t&&l.pb.t.length){f.tiers=l.pb.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]});f.price=f.tiers[0][1];f.name=l.pb.f}return f}
 function buildInp(mod){mod=mod||{};var a=S.aircraft[S.ac]||S.aircraft[0],rm=mod.rateMul||1;
  return{aircraft:{rate:num(a.rate)*rm,cap:num(a.cap),res:num(a.resLb)/dens(),burn:num(a.burn),bow:num(a.bow),ramp:num(a.ramp),mtow:num(a.mtow),mlw:num(a.mlw),payload:num(a.payload),taxi:num(a.taxi),dens:dens()},
  fbos:S.legs.map(function(l,i){var f=legFbo(l);if(mod.pm){var m=mod.pm(i);f.price*=m;if(f.tiers)f.tiers.forEach(function(t){t[1]*=m})}if(mod.add&&mod.add.i===i){f.price+=mod.add.d;if(f.tiers)f.tiers.forEach(function(t){t[1]+=mod.add.d})}return f}),
@@ -296,7 +303,7 @@ function closeTxt(s){return "Close call at "+(s.from||"?")+": this buy only save
 function noteHtml(s){return s?'<div class="dnote"><i class="dot" style="background:'+LCOL[s.lvl]+'" title="'+s.lvl+'"></i>'+esc(noteTxt(s))+'</div>':""}
 function tierTxt(x,l){var f=l&&l.fbo;if(!f||!f.name)return"";var t=l.tiers?l.tiers[Math.max(0,x.ti)]:null;return f.name+(t?", "+pbTierLab(t[0])+" gal tier $"+x.tp.toFixed(2):" $"+x.tp.toFixed(2))}
 function pbLine(x,l,html){var sl=S.legs[l.i]||{},pb=sl.pb;if(!pb||!l.fbo||!l.fbo.name)return"";var ex=pb.d&&pb.d<pbToday(),t=tierTxt(x,l);
- if(!html){var dd=(pb.d?"price date "+pbDTxt(pb.d)+(ex?" EXPIRED":""):"")+(pb.r?(pb.d?", ":"")+"received "+pbDTxt(pb.r)+(pbStale(pb)?" — older than "+(pb.sd||14)+" days":""):"");return "Contract: "+pbProvOf(pb)+" — "+t+(dd?" ("+dd+")":"")+(pb.info&&pb.info.posted!=null?" · "+pbInfoTxt(pb.info):"")+(pb.fe&&pb.fe.length?" · per-flight fees not included: "+pbFeeTxt(pb.fe):"");}
+ if(!html){var dd=(pb.ef&&pb.ef>pbToday()?"effective from "+pbDTxt(pb.ef)+", ":"")+(pb.d?(pb.dir?"expires ":"price date ")+pbDTxt(pb.d)+(ex?" EXPIRED":""):"")+(pb.r?(pb.d?", ":"")+"received "+pbDTxt(pb.r)+(pbStale(pb)?" — older than "+(pb.sd||14)+" days":""):"");return "Contract: "+pbProvOf(pb)+" — "+t+(dd?" ("+dd+")":"")+(pb.info&&pb.info.posted!=null?" · "+pbInfoTxt(pb.info):"")+(pb.note?" · "+pb.note:"")+(x.capMax!=null?" · capped at contract max "+gal(x.capMax)+" gal":"")+(pb.fe&&pb.fe.length?" · per-flight fees not included: "+pbFeeTxt(pb.fe):"");}
  return '<div class="pbl">'+esc(t)+' <span class="lbu">· '+esc(pb.v)+'</span>'+(ex?' <span class="tg exp">expired '+pbDTxt(pb.d,1)+'</span>':'')+(pbStale(pb)?' <span class="tg exp">older than '+(pb.sd||14)+' days</span>':'')+'</div>'}
 function closeCard(sv){if(!sv||!sv.close.length)return"";return '<div class="card warn close">'+sv.close.map(function(s){return '<div>⚠️ '+esc(closeTxt(s))+'</div>'}).join("")+'</div>'}
 function sensText(sv){if(!sv||!sv.close.length)return[];var L=["CLOSE CALLS"];sv.close.forEach(function(s){L.push("• "+closeTxt(s))});return L}
@@ -319,18 +326,22 @@ function upChart(r,cap){var W=340,lh=46,top=8,lw=70,pw=W-lw-10,H=top+r.rows.leng
   s+='<text x="'+lw+'" y="'+(y+42)+'" class="t s">'+fqT(x.u)+' · need-only '+gal(nd)+' gal</text>'});
  s+='<text x="'+lw+'" y="'+(H-2)+'" class="t s">┆ waiver min   ┃ need-only (baseline) amount</text>';
  return '<div class="card"><b>Fuel to buy at each airport</b><svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Uplift chart">'+s+'</svg></div>'}
-function fobChart(r,cap,WW){var W=WW||340,H=190,L=40,R=36,T=10,B=28,n=r.rows.length,pw=W-L-R,ph=H-T-B,pts=[],s='';
+function fobChart(r,cap,WW){var W=WW||340,H=190,L=40,R=36,T=10,B=28,n=r.rows.length,pw=W-L-R,ph=H-T-B,pts=[],s='',wlL=null,lastMin=null;
  var sx=function(i){return L+i/n*pw},sy=function(v){return T+ph-v/cap*ph};
  for(var g=0;g<=4;g++){var v=cap*g/4;s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+sy(v)+'" y2="'+sy(v)+'" class="grd"/><text x="'+(L-3)+'" y="'+(sy(v)+3)+'" class="t s" text-anchor="end">'+(v>=1000?(v/1000).toFixed(1)+'k':gal(v))+'</text><text x="'+(W-R+3)+'" y="'+(sy(v)+3)+'" class="t s">'+(v*dens()>=1000?(v*dens()/1000).toFixed(1)+'k':gal(v*dens()))+'</text>'}
  s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+sy(cap)+'" y2="'+sy(cap)+'" class="cap"/><text x="'+(W-R)+'" y="'+(sy(cap)+11)+'" class="t s" text-anchor="end">max '+fqT(cap)+'</text>';
  r.rows.forEach(function(x,i){var l=r.legs[i],k=cat(x,l,cap),mn=l.trip+l.res;
   s+='<rect x="'+(sx(i)-5)+'" y="'+sy(x.dep)+'" width="10" height="'+Math.max(0,sy(x.arrBefore)-sy(x.dep))+'" style="fill:'+k.c+'"/>';
-  s+='<line x1="'+sx(i)+'" x2="'+sx(i+1)+'" y1="'+sy(mn)+'" y2="'+sy(mn)+'" class="min"/>';if(l.cap!=null&&l.cap<cap-0.5)s+='<line x1="'+sx(i)+'" x2="'+sx(i+1)+'" y1="'+sy(l.cap)+'" y2="'+sy(l.cap)+'" class="wl"/>';
+  s+='<line x1="'+sx(i)+'" x2="'+sx(i+1)+'" y1="'+sy(mn)+'" y2="'+sy(mn)+'" class="min"/>';if(l.cap!=null&&l.cap<cap-0.5){s+='<line x1="'+sx(i)+'" x2="'+sx(i+1)+'" y1="'+sy(l.cap)+'" y2="'+sy(l.cap)+'" class="wl"/>';wlL={i:i,y:sy(l.cap),lim:l.lim}}lastMin={i:i,y:sy(mn)};
   pts.push(sx(i)+','+sy(x.arrBefore),sx(i)+','+sy(x.dep),sx(i+1)+','+sy(x.arr));
   s+='<text x="'+sx(i)+'" y="'+(H-B+13)+'" class="t s" text-anchor="middle">'+esc(l.from||"?")+'</text>'});
  s+='<text x="'+sx(n)+'" y="'+(H-B+13)+'" class="t s" text-anchor="end">'+esc(r.legs[n-1].to||"?")+'</text>';
  s+='<polyline points="'+pts.join(" ")+'" class="fob"/>';
- return '<div class="card"><b>Fuel on board across the route</b><div class="sm">left axis gal · right axis lb</div><svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Fuel on board chart">'+s+'</svg><p class="muted"><span class="ln fob"></span>fuel on board (colored bar = uplift) · <span class="ln min"></span>min required at departure (trip+reserve) · <span class="ln cap"></span>max capacity</p></div>'}
+ // on-line labels (halo keeps them readable over bars/lines in light and dark mode)
+ var capY=sy(cap);
+ if(wlL){var wy=wlL.y-4;if(wy<capY+20)wy=wlL.y+11;s+='<text x="'+(sx(wlL.i+1)-3)+'" y="'+wy+'" class="t s lbl wlt" style="fill:var(--c-lim)" text-anchor="end">Max fuel ('+esc(wlL.lim||"weight")+' limit)</text>'}
+ if(lastMin){var my=lastMin.y-4;if(wlL&&Math.abs(my-(wlL.y-4))<12)my=lastMin.y+11;s+='<text x="'+(sx(lastMin.i+1)-3)+'" y="'+my+'" class="t s lbl mint" style="fill:var(--warn)" text-anchor="end">Min required</text>'}
+ return '<div class="card"><b>Fuel on board across the route</b><div class="sm">left axis gal · right axis lb</div><svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Fuel on board chart">'+s+'</svg><p class="muted"><span class="ln fob"></span>fuel on board (colored bar = uplift) · <span class="ln min"></span>min required at departure (trip+reserve) · <span class="ln cap"></span>max capacity'+(wlL?' · <span class="ln wl"></span>max fuel from weight limits (MTOW / MLW / ramp, per leg)':'')+'</p></div>'}
 function costChart(r,cap){var W=340,lh=40,lw=50,top=6,H=top+r.rows.length*lh+16,mx=1,s='';
  var base=r.rows.map(function(x,i){var u=r.baseUplift[i]||0;return{f:u*r.legs[i].p,fee:r.legs[i].fee}});
  r.rows.forEach(function(x,i){mx=Math.max(mx,x.stop,base[i].f+base[i].fee)});var pw=W-lw-70,sx=function(v){return v/mx*pw};
@@ -478,7 +489,11 @@ var PB_FIELDS=[["ignore","Ignore"],["code","Airport"],["country","Country"],["fb
 var PB_BUILTIN=[{id:"worldfuel",name:"World Fuel",src:"World Fuel",builtin:true,header:false,codeType:"auto",cols:{code:0,country:1,fbo:2,min:3,price:4,notes:5,date:7},ncol:8},
  // Atlantic Aviation direct: header row, one JETA price per airport, no FBO/tier/date columns; CustomerOTDPrice is the contract price
  {id:"atlantic",name:"Atlantic Aviation",src:"Atlantic direct",builtin:true,header:true,codeType:"auto",country:"United States",fbo:"Atlantic Aviation",received:true,staleDays:14,
-  cols:{code:"Airportcode",product:"Product",price:"CustomerOTDPrice"},info:{posted:"PostedOTDPrice",discount:"Discount"}}];
+  cols:{code:"Airportcode",product:"Product",price:"CustomerOTDPrice"},info:{posted:"PostedOTDPrice",discount:"Discount"}},
+ // Direct: the company's own direct contracts. ICAO preferred (IATA, then FAA fallback), min/max volume tiers, unit G/L, USD only, effective/expiration dates
+ {id:"direct",name:"Direct",src:"Direct",builtin:true,header:true,codeType:"auto",direct:true,stripFbo:/^\s*direct\s*-\s*/i,
+  cols:{code:"ICAO",iata:"IATA",faa:"FAA",fbo:"FBO Name",country:"Country",product:"Fuel Type",min:"Minimum Volume",max:"Maximum Volume",unit:"Unit Type",price:"Price",currency:"Currency",eff:"Effective Date",date:"Expiration Date",notes:"Notes"}}];
+var L_PER_GAL=3.78541;
 function p2(n){return (n<10?"0":"")+n}
 function pbToday(){if(PB_TODAY)return PB_TODAY;var d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())}
 function pbDate(s){s=String(s||"").trim();var m=s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2}|\d{4})$/),y;
@@ -516,15 +531,22 @@ function pbBuild(rows,prof,opt){opt=opt||{};var c=prof.cols,hdr=null,st=0,ci={},
  if(prof.header){hdr=(rows[0]||[]).map(function(x){return String(x).trim().toLowerCase()});st=1}
  var col=function(v){return typeof v==="number"?v:(hdr?hdr.indexOf(String(v).trim().toLowerCase()):-1)};for(k in c)ci[k]=col(c[k]);for(k in (prof.info||{}))ii[k]=col(prof.info[k]);
  var g=function(r,f){var j=ci[f];return j!=null&&j>=0&&r[j]!=null?String(r[j]).trim():""},hasC=ci.country!=null&&ci.country>=0;
- var off={},sum={rows:0,imported:0,cfp:0,bad:0,unknown:0,unk:{},expired:0,additive:0},td=pbToday();
+ var off={},sum={rows:0,imported:0,cfp:0,bad:0,unknown:0,unk:{},expired:0,additive:0,cur:0},td=pbToday();
  for(var i=st;i<rows.length;i++){var r=rows[i];if(!r||r.length<2)continue;sum.rows++;
-  var pr=pbNum(g(r,"price"));if(pr>=9999){sum.cfp++;continue}if(!(pr>0&&pr<100)){sum.bad++;continue}
-  var code=g(r,"code").toUpperCase(),ic=pbResolve(code,hasC?g(r,"country")||"?":(prof.country||null),prof.codeType,!hasC&&!!prof.country);
+  var pr=pbNum(g(r,"price")),cu=g(r,"currency").toUpperCase(),un=g(r,"unit").toUpperCase(),lit=/^L/.test(un);
+  if(cu&&cu!=="USD"){sum.cur=(sum.cur||0)+1;(sum.curs=sum.curs||{})[cu]=1;continue}   // currency not supported (USD only)
+  if(lit)pr*=L_PER_GAL;                                                                // $/litre → $/US gal
+  if(pr>=9999){sum.cfp++;continue}if(!(pr>0&&pr<100)){sum.bad++;continue}
+  var cty=hasC?g(r,"country")||"?":(prof.country||null),code=g(r,"code").toUpperCase(),ic=pbResolve(code,cty,prof.codeType,!hasC&&!!prof.country);
+  if(!ic&&ci.iata>=0&&g(r,"iata")){var c2=g(r,"iata").toUpperCase();ic=pbResolve(c2,cty,"auto");if(!code)code=c2}
+  if(!ic&&ci.faa>=0&&g(r,"faa")){var c3=g(r,"faa").toUpperCase();ic=pbResolve(c3,cty,"auto");if(!code)code=c3}
   if(!ic){sum.unknown++;sum.unk[code||"(blank)"]=(sum.unk[code||"(blank)"]||0)+1;continue}
-  var notes=g(r,"notes"),prod=pbProdNorm(g(r,"product")||pbProduct(notes)),add=/ADDITIVE/.test(prod),fb=prof.fbo||pbFboName(g(r,"fbo"))||"(FBO not given)",mn=pbNum(g(r,"min")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
-  if(!(mn>=0))mn=0;if(!o){o=off[key]={a:ic,c:code,f:fb,p:prod,x:add,d:prof.received?null:d,t:[],fe:pbFees(notes)};if(rcv){o.r=rcv;o.sd=prof.staleDays||14}
+  var notes=g(r,"notes"),prod=pbProdNorm(g(r,"product")||pbProduct(notes)),add=/ADDITIVE/.test(prod),fraw=g(r,"fbo"),fb=prof.fbo||(prof.stripFbo?fraw.replace(prof.stripFbo,"").trim()||fraw:pbFboName(fraw))||"(FBO not given)",mn=pbNum(g(r,"min")),mx=pbNum(g(r,"max")),ef=pbDate(g(r,"eff")),d=pbDate(g(r,"date")),key=ic+"|"+fb+"|"+prod,o=off[key];
+  if(!(mn>=0))mn=0;if(lit){mn/=L_PER_GAL;if(mx>0)mx/=L_PER_GAL}
+  if(!o){o=off[key]={a:ic,c:code,f:fb,p:prod,x:add,d:prof.received?null:d,t:[],fe:pbFees(notes)};if(prof.stripFbo&&fraw!==fb)o.fn=fraw;if(prof.direct){o.dir=1;if(notes)o.note=notes}if(rcv){o.r=rcv;o.sd=prof.staleDays||14}
    var inf={},hi=false;for(var q in ii)if(ii[q]>=0&&r[ii[q]]!=null&&String(r[ii[q]]).trim()!==""){inf[q]=pbNum(r[ii[q]]);hi=true}if(hi)o.info=inf}
-  var dup=o.t.filter(function(t){return t[0]===mn})[0];if(dup)dup[1]=Math.min(dup[1],pr);else o.t.push([mn,pr]);
+  if(ef&&(!o.ef||ef>o.ef))o.ef=ef;if(lit)o.lit=1;
+  var dup=o.t.filter(function(t){return t[0]===mn})[0];if(dup){if(pr<dup[1]){dup[1]=pr;if(mx>0)dup[2]=mx}}else o.t.push(mx>0?[mn,pr,mx]:[mn,pr]);
   if(!prof.received&&d&&(!o.d||d<o.d))o.d=d;sum.imported++;if(!prof.received&&d&&d<td)sum.expired++;if(add)sum.additive++}
  var list=Object.keys(off).map(function(k){var o=off[k];o.t.sort(function(a,b){return a[0]-b[0]});return o}),ap={};
  list.forEach(function(o){ap[o.a]=1});sum.airports=Object.keys(ap).length;sum.offers=list.length;
@@ -544,12 +566,14 @@ function pbDel(id,cb){PB.vendors=PB.vendors.filter(function(x){return x.id!==id}
 function pbKey(e){return e.v.id+"|"+e.o.f+"|"+e.o.p}
 function pbOffers(icao){return (PB.idx[icao]||[]).filter(function(e){return S.useAdd||!e.o.x}).slice().sort(function(a,b){return a.o.t[0][1]-b.o.t[0][1]})}
 function pbBest(t){var b=t[0];t.forEach(function(x){if(x[1]<b[1])b=x});return b}
+function pbP4(p){return Math.abs(p*100-Math.round(p*100))>1e-6?p.toFixed(4):p.toFixed(2)}
+function pbRange(t){return t[2]>0?gal(Math.max(1,Math.ceil(t[0]-1e-9)))+"–"+gal(Math.floor(t[2]+1e-9)):pbTierLab(t[0])}
 function pbTierLab(m){return gal(Math.max(1,Math.ceil(m-1e-9)))+"+"}
 function pbProv(v){return v?(v.name||v.src||"Contract"):"Contract"}
 function pbProvOf(pb){if(!pb)return"";if(pb.prov)return pb.prov;var v=PB.vendors.filter(function(x){return x.id===pb.vid})[0];if(v)return pbProv(v);var p=pbProfiles().filter(function(x){return x.id===pb.vid})[0];return p?p.name:(pb.v||"Contract")}
 function pbTrunc(s,n){return s.length>n?s.slice(0,n-1)+"…":s}
-function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return pbProv(e.v)+" · "+pbTrunc(o.f,24)+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(o.d&&o.d<pbToday()?" · expired":"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
-function pbSnap(e){return{k:pbKey(e),v:e.v.src||e.v.name,prov:pbProv(e.v),vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,t:e.o.t.map(function(t){return[t[0],t[1]]}),fe:e.o.fe}}
+function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return pbProv(e.v)+" · "+pbTrunc(o.f,24)+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(o.d&&o.d<pbToday()?" · expired":"")+(o.ef&&o.ef>pbToday()?" · from "+pbDTxt(o.ef,1):"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
+function pbSnap(e){return{k:pbKey(e),v:e.v.src||e.v.name,prov:pbProv(e.v),vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,fn:e.o.fn||null,note:e.o.note||null,ef:e.o.ef||null,dir:e.o.dir||0,lit:e.o.lit||0,t:e.o.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]}),fe:e.o.fe}}
 function pbPick(i,key){var l=S.legs[i];if(!l)return;if(!key||key==="manual"){delete l.pb;return}
  var e=pbOffers(l.from).concat(PB.idx[l.from]||[]).filter(function(x){return pbKey(x)===key})[0];if(!e)return;l.pb=pbSnap(e);l.price=l.pb.t[0][1];
  var m=(S.fboMem||{})[l.from+"|"+e.o.f];if(m){l.fee=m.fee;l.waiver=m.waiver}}
@@ -560,13 +584,13 @@ function pbLegHtml(l,i){var of=pbOffers(l.from),cur=l.pb;if(!of.length&&!cur)ret
  var h='<div class="pbleg"><label>Contract FBO at '+esc(l.from)+' <span class="info" title="'+esc(TIER_TIP)+'">ⓘ</span></label><select data-pb="'+i+'"><option value="manual">Manual price</option>';
  var has=false;of.forEach(function(e){var k=pbKey(e);if(cur&&cur.k===k)has=true;h+='<option value="'+esc(k)+'"'+(cur&&cur.k===k?' selected':'')+'>'+esc(pbOptLab(e,multi))+'</option>'});
  if(cur&&!has)h+='<option value="'+esc(cur.k)+'" selected>'+esc(cur.f+" (saved)")+'</option>';h+='</select>';
- if(cur){h+='<div class="hint">Contract provider: <b>'+esc(pbProvOf(cur))+'</b><br>'+esc(cur.v)+(cur.d?' · price date '+pbDTxt(cur.d):'')+(cur.r?' · received '+pbDTxt(cur.r):'')+(ex?' <span class="tg exp">expired '+pbDTxt(cur.d,1)+'</span>':'')+(pbStale(cur)?' <span class="tg exp">older than '+(cur.sd||14)+' days</span>':'')+'<br>'+(cur.t.length>1?'Tiers: '+cur.t.map(function(t){return pbTierLab(t[0])+' $'+t[1].toFixed(2)}).join(' · '):'Contract $'+cur.t[0][1].toFixed(2)+'/gal (one price)')+(cur.info&&cur.info.posted!=null?' · '+esc(pbInfoTxt(cur.info)):'')+'</div>'+(cur.fe&&cur.fe.length?'<div class="hint">ⓘ Per-flight fees (not included): '+esc(pbFeeTxt(cur.fe))+'</div>':'')}
+ if(cur){var fut=cur.ef&&cur.ef>pbToday();h+='<div class="hint">Contract provider: '+(cur.dir?'<span class="tg dir">'+esc(pbProvOf(cur))+'</span>':'<b>'+esc(pbProvOf(cur))+'</b>')+(cur.fn?' · '+esc(cur.fn):'')+'<br>'+esc(cur.v)+(cur.ef?' · effective '+pbDTxt(cur.ef):'')+(cur.d?(cur.dir?' · expires ':' · price date ')+pbDTxt(cur.d):'')+(fut?' <span class="tg exp">effective from '+pbDTxt(cur.ef)+'</span>':'')+(cur.r?' · received '+pbDTxt(cur.r):'')+(ex?' <span class="tg exp">expired '+pbDTxt(cur.d,1)+'</span>':'')+(pbStale(cur)?' <span class="tg exp">older than '+(cur.sd||14)+' days</span>':'')+'<br>'+(cur.t.length>1?'Tiers: '+cur.t.map(function(t){return pbRange(t)+' $'+pbP4(t[1])}).join(' · '):'Contract $'+pbP4(cur.t[0][1])+'/gal '+(cur.t[0][2]>0?'('+pbRange(cur.t[0])+' gal)':'(one price)'))+(cur.lit?' · converted from $/litre':'')+(cur.note?' · '+esc(cur.note):'')+(cur.info&&cur.info.posted!=null?' · '+esc(pbInfoTxt(cur.info)):'')+'</div>'+(cur.fe&&cur.fe.length?'<div class="hint">ⓘ Per-flight fees (not included): '+esc(pbFeeTxt(cur.fe))+'</div>':'')}
  else h+='<div class="hint">'+of.length+' contract price'+(of.length>1?'s':'')+' on file — pick one to fill the price.</div>';
  return h+'</div>'}
 function pbSumHtml(s,name){var u=Object.keys(s.unk||{}).sort();return '<div class="pbsum"><b>Imported '+esc(name)+'</b><div class="kv">'+
  '<span>Rows read</span><span>'+gal(s.rows)+'</span><span>Prices imported</span><span>'+gal(s.imported)+'</span><span>Airports</span><span>'+gal(s.airports)+'</span><span>FBOs</span><span>'+gal(s.fbos)+'</span>'+
  '<span>Additive rows (+additive)</span><span>'+gal(s.additive)+'</span><span>Expired</span><span>'+gal(s.expired)+' rows · '+gal(s.expOffers)+' FBO price lists</span>'+
- '<span>Skipped: call for price</span><span>'+gal(s.cfp)+'</span><span>Skipped: bad price</span><span>'+gal(s.bad)+'</span><span>Skipped: unknown airport code</span><span>'+gal(s.unknown)+(u.length?' ('+u.length+' code'+(u.length>1?'s':'')+')':'')+'</span></div>'+
+ (s.cur?'<span>Skipped: currency not supported</span><span>'+gal(s.cur)+' ('+esc(Object.keys(s.curs||{}).join(", "))+')</span>':'')+'<span>Skipped: call for price</span><span>'+gal(s.cfp)+'</span><span>Skipped: bad price</span><span>'+gal(s.bad)+'</span><span>Skipped: unknown airport code</span><span>'+gal(s.unknown)+(u.length?' ('+u.length+' code'+(u.length>1?'s':'')+')':'')+'</span></div>'+
  (u.length?'<details><summary class="sm">Unknown codes</summary><p class="sm codes">'+esc(u.join(", "))+'</p></details>':'')+'</div>'}
 function pbMapHtml(){var P=PB.pending,n=P.ncol,h='<div class="pbmap"><b>New file layout</b><p class="muted">'+esc(P.file||"")+' wasn’t recognised. Pick what each column holds, then save the layout as a profile for next time.</p><div class="tw"><table><thead><tr>';
  for(var c=0;c<n;c++){h+='<th><select data-pbmap="'+c+'">'+PB_FIELDS.map(function(f){return '<option value="'+f[0]+'"'+(P.map[c]===f[0]?' selected':'')+'>'+f[1]+'</option>'}).join("")+'</select></th>'}
