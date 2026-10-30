@@ -188,7 +188,7 @@ function optimize(inp){
   out.altSavings=alt-best.obj;
   return out;}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.10.30.1724b",APP_BUILT="2026-10-30 17:24";
+var APP_VERSION="2026.10.30.1759",APP_BUILT="2026-10-30 17:59";
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -284,7 +284,7 @@ function tripHint(l){return (l.tripManual?'<span class="tg man">manual</span> <b
 function resHint(l){return '≈ '+gal(resLb(l)/dens())+' gal · '+(resLb(l)<RES_LB?'<span style="color:var(--warn)">below 5,000 lb minimum</span>':'default 5,000 lb')}
 function wvHint(l){return blank(l.waiver)?'':'≈ '+gal(num(l.waiver)*dens())+' lb'}
 S.credit=0;S.aircraft.forEach(function(a){var d=WDEF[a.name];if(d&&a.mtow==null)for(var k in d)a[k]=d[k];if(d&&((a.name==='Gulfstream G650ER'&&+a.payload===1600)||(a.name==='Dassault Falcon 2000LXS'&&+a.payload===1200)))a.payload=0});if(!S.view)S.view="auto";if(S.setOpen==null)S.setOpen=false;S.legs.forEach(function(l){delete l.dep;l.from=icaoNorm(l.from);l.to=icaoNorm(l.to);["from","to"].forEach(function(f){if(l[f+"T"]!=null)l[f+"T"]=icaoNorm(l[f+"T"]);var t=l[f+"T"]||l[f];if(t)l[f]=aptIcao(t)});if(l.hoursManual==null)l.hoursManual=!blank(l.hours);if(l.tripManual==null)l.tripManual=!blank(l.trip)});
-ovPurge();   // drop overrides-era saved state (status, errors, toggles, cached rows)
+ovPurge();fhHeal();   // drop overrides-era saved state (status, errors, toggles, cached rows)
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="fhBusy"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
 if(S&&S.gh){delete S.gh.busy;delete S.gh.ovBusy;delete S.gh.runId}   // stale "Checking…" from a run killed mid-check (page closed / iOS suspended) used to lock the button forever
 var $=function(s){return document.querySelector(s)};
@@ -631,6 +631,8 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
  if(t.id==="fhsigmig"){var hs=HS.list.filter(function(x){return x.prof==="signature"})[0];if(hs){S.fhSigErr="";fhSigStart(hs.apts,"Current signature-handling file (one-time migration)")}render();return}
  if(t.id==="fhsigok"){fhSigApply();render();save();return}
  if(t.id==="fhsigx"){FH_SIG=null;render();return}
+ if(t.id==="fhfclr"){S.fhF={q:"",ac:"",src:""};render();save();return}
+ if(t.id==="fhreload"){var gv0=ghCfg().v["fbo-handling"]=ghCfg().v["fbo-handling"]||{on:true};gv0.on=true;fhData().rows=fhData().rows||[];delete gv0.sha;gv0.err=null;ghCfg().etag=null;if(ghTok())ghPoll(true,function(){render();save()});render();return}
  if(t.id==="stalerel"){try{location.reload()}catch(x){}return}
  if(t.id==="fhimp"){var fi=$("#fhfile");if(fi)fi.click();return}
  if(t.id==="fhimpok"){fhImportOk();render();save();return}
@@ -945,7 +947,7 @@ var GH_KEY="tankering.ghtoken",GH_EVERY=6*3600e3,GH_API="https://api.github.com/
 function ghTok(){try{return localStorage.getItem(GH_KEY)||""}catch(e){return""}}
 function ghSetTok(v){try{if(v)localStorage.setItem(GH_KEY,v);else localStorage.removeItem(GH_KEY)}catch(e){}}
 /* folders the app never reads (shared overrides retired 2026-10-30; the repo folder was deleted) */
-function ghIgnored(f){return /^overrides$/i.test(String(f||""))}
+function ghIgnored(f){return /^(overrides|app)$/i.test(String(f||""))}   // app/ = min-version.txt, not a price folder
 /* one-time clean-up of saved state from the overrides era: folder status/errors/toggles, cached rows, queues, leg flags */
 function ovPurge(){var g=S.gh;if(g){if(g.v)Object.keys(g.v).forEach(function(f){if(ghIgnored(f))delete g.v[f]});if(Array.isArray(g.folders))g.folders=g.folders.filter(function(f){return !ghIgnored(f)});if(g.err&&/overrides/i.test(g.err))g.err=null;if(g.msg&&/overrides/i.test(g.msg))g.msg=String(g.msg).split(" · ").filter(function(x){return !/overrides/i.test(x)}).join(" · ");if(g.autoErr&&/overrides/i.test(g.autoErr))g.autoErr=null;["ovRO","ovSaved","ovErr","ovBusy"].forEach(function(k){delete g[k]})}
  ["ovData","ovQ","ovPending"].forEach(function(k){delete S[k]});(S.legs||[]).forEach(function(l){["ovOff","ovSrc","ovr","ovPrice","acMan","acCur"].forEach(function(k){delete l[k]})})}
@@ -1056,7 +1058,7 @@ function acKey(){return ovAcNorm(acNow().name)||acNow().name}
 var FH_COLS=["airport","fbo","aircraft","handling_fee","waiver_gal","effective_date","note","updated_at","updated_by","source"],FH_PATH="fbo-handling/latest.csv",FH_F=["handling_fee","waiver_gal","effective_date","note","source"],FH_ACS=["G650ER","Falcon 2000LXS"];
 function fhData(){var d=S.fhData=S.fhData||{rows:[],sha:null};d.rows=d.rows||[];return d}
 function fhQ(){return S.fhQ=S.fhQ||[]}
-function fhHdr(rows){return (rows[0]||[]).map(function(x){return String(x==null?"":x).trim().toLowerCase()})}
+function fhHdr(rows){return (rows[0]||[]).map(function(x){return String(x==null?"":x).replace(/^\ufeff/,"").trim().toLowerCase().replace(/[\s\-]+/g,"_")})}
 function fhDetect(rows){var h=fhHdr(rows);return ["airport","fbo","aircraft","handling_fee","waiver_gal"].every(function(c){return h.indexOf(c)>=0})&&h.indexOf("fuel_price")<0}
 function fhKey(o){return String(o.airport).toUpperCase()+"|"+String(o.fbo).trim().toLowerCase()+"|"+String(o.aircraft||"").trim().toLowerCase()}
 function fhNum(v){v=String(v==null?"":v).trim();if(v==="")return null;var n=pbNum(v);return isFinite(n)?n:NaN}
@@ -1077,7 +1079,9 @@ function fhCsv(rows){return FH_COLS.join(",")+"\n"+(rows||[]).slice().sort(funct
 function fhMerge(rows,items,who){var by={};rows.forEach(function(o){by[fhKey(o)]=o});items.forEach(function(it){it.rows.forEach(function(r){var k=fhKey(r);if(r.del){delete by[k];return}
   var n=Object.assign({},by[k]||{},{airport:r.airport,fbo:r.fbo,aircraft:r.aircraft});FH_F.forEach(function(f){if(r[f]!==undefined)n[f]=r[f]});n.updated_at=it.at;n.updated_by=who||n.updated_by||"";by[k]=n})});
  return Object.keys(by).map(function(k){return by[k]})}
-function fhLoadRows(rows,sha){var p=fhParse(rows);var d=fhData();d.rows=fhMerge(p.rows,fhQ(),ovWhoTxt());d.sha=sha||null;d.bad=p.bad.length}
+function fhLoadRows(rows,sha){var p=fhParse(rows);var d=fhData();d.rows=fhMerge(p.rows,fhQ(),ovWhoTxt());d.sha=sha||null;d.bad=p.bad.length;d.badWhy=p.bad.slice(0,3).map(function(b){return "line "+b.line+": "+b.why}).join(" · ")}
+/* self-heal: an empty / mismatched cached table forces a fresh download on the next check */
+function fhHeal(){var g=S.gh,d=fhData(),gv=g&&g.v&&g.v["fbo-handling"];if(!gv)return false;if(!d.rows.length||!d.sha||d.sha!==gv.sha||gv.err){delete gv.sha;gv.err=null;if(g){g.etag=null;g.nextAt=0;g.lastPoll=0}return true}return false}
 function fhQueue(rows,msg){var it={rows:rows,at:ovStamp(),msg:msg||null};fhQ().push(it);var d=fhData();d.rows=fhMerge(d.rows,[it],ovWhoTxt());fhFlush(function(){render();save()})}
 /* write path: Contents API with the device PAT, SHA-conflict retry, offline queue, updated_by from GET /user + "Your name" */
 function fhFlush(cb,tries){var g=ghCfg(),q=fhQ();tries=tries||0;if(!q.length||g.fhBusy||!ghTok()||!ghOnline()){cb&&cb();return}g.fhBusy=true;
@@ -1088,7 +1092,7 @@ function fhFlush(cb,tries){var g=ghCfg(),q=fhQ();tries=tries||0;if(!q.length||g.
   var items=q.slice();items.forEach(function(it){it.sent=1});var rows=fhMerge(base,items,who),f0=items[0].rows[0]||{},msg=(items.length===1&&items[0].msg?items[0].msg:items.length===1?"FBO handling "+f0.airport+" "+f0.fbo+" ("+f0.aircraft+"): "+(f0.del?"deleted":"$"+f0.handling_fee+" fee, "+(f0.waiver_gal==null?"no waiver":f0.waiver_gal+" gal")):"FBO handling: "+items.length+" changes")+" by "+who;
   var body={message:msg,content:ovB64e(fhCsv(rows)),branch:g.branch};if(sha)body.sha=sha;
   ovReq("PUT",GH_API+g.repo.replace(/^\/+|\/+$/g,"")+"/contents/"+FH_PATH,body,function(e2,r){
-   if(!e2){S.fhQ=fhQ().slice(items.length);var dd=fhData();dd.rows=fhMerge(rows,fhQ(),who);dd.sha=r&&r.content&&r.content.sha||null;var gv=g.v["fbo-handling"]=g.v["fbo-handling"]||{on:true};gv.sha=dd.sha;gv.at=ghNow();gv.name="FBO handling";gv.err=null;g.fhRO=false;g.fhSaved={at:ghNow(),msg:msg};fin(null);return}
+   if(!e2){S.fhQ=fhQ().slice(items.length);var dd=fhData(),np=fhParse(csvParse(fhCsv(rows)));dd.rows=fhMerge(np.rows,fhQ(),who);dd.bad=np.bad.length;dd.sha=r&&r.content&&r.content.sha||null;var gv=g.v["fbo-handling"]=g.v["fbo-handling"]||{on:true};gv.sha=dd.sha;gv.at=ghNow();gv.name="FBO handling";gv.err=null;g.fhRO=false;g.fhSaved={at:ghNow(),msg:msg};fin(null);return}
    if((e2.status===409||e2.status===422)&&tries<3){g.fhBusy=false;fhFlush(cb,tries+1);return}
    if(e2.status===403||e2.status===401||(e2.status===404&&sha)){g.fhRO=true;fin(OV_RO);return}
    if(e2.off){fin("Offline — "+q.length+" FBO handling change(s) queued, will retry.");return}fin(e2.msg)})})})})}
@@ -1138,12 +1142,18 @@ function fhAll(){var out=[],acOf={};var map=hdlCfg().map;Object.keys(map).forEac
  HS.list.forEach(function(s){for(var ic in s.apts){var A=s.apts[ic];for(var b in A.b)for(var ty in A.b[b]){if(!acOf[ty])continue;var v=A.b[b][ty];out.push({airport:ic,fbo:sigBaseName(b)||"Signature Flight Support",base:b,aircraft:acOf[ty],fee:v[1],wv:v[0],src:"Signature file (suggestion)",rank:1,at:s.imported,by:"",note:"base "+b})}}});
  var top={};out.forEach(function(r){var k=fhKey(r);if(!top[k]||r.rank>top[k].rank)top[k]=r});var td=pbToday();out.forEach(function(r){r.st=!r.tab?"suggestion only":r.eff&&r.eff>td?"future":top[fhKey(r)]===r?"in use":"superseded"});return out}
 function fhCity(c){var a=aptIdx()[c];return a?a[2]:""}
-function fhView(){var F=S.fhF=S.fhF||{q:"",ac:"",src:""},so=S.fhSort=S.fhSort||{k:"airport",d:1},q=String(F.q||"").trim().toLowerCase();
+var FH_SRCS=["Manual","Leg card","Signature schedule","Signature file (suggestion)"];
+function fhView(){var F=S.fhF=S.fhF||{q:"",ac:"",src:""};if(F.src&&FH_SRCS.indexOf(F.src)<0)F.src="";if(F.ac&&FH_ACS.indexOf(F.ac)<0)F.ac="";var so=S.fhSort=S.fhSort||{k:"airport",d:1},q=String(F.q||"").trim().toLowerCase();
  var rs=fhAll().filter(function(r){return (!q||(r.airport+" "+r.fbo+" "+fhCity(r.airport)).toLowerCase().indexOf(q)>=0)&&(!F.ac||r.aircraft===F.ac)&&(!F.src||r.src===F.src)});
  var key=function(r){var v=r[so.k];return v==null?(so.k==="wv"?Infinity:""):v};rs.sort(function(a,b){var x=key(a),y=key(b),c=typeof x==="number"&&typeof y==="number"?x-y:String(x).localeCompare(String(y));return (c||fhKey(a).localeCompare(fhKey(b)))*so.d});return rs}
 var FH_LAST=[];
-function fhTableHtml(){var rs=fhView(),so=S.fhSort;FH_LAST=rs;var th=function(k,t){return '<th><button class="lk" data-fhsort="'+k+'">'+t+(so.k===k?(so.d>0?' ▲':' ▼'):'')+'</button></th>'};
- var h='<p class="sm"><b>'+rs.length+'</b> row'+(rs.length===1?'':'s')+' · <span class="tg">in use</span> = what the planner applies · <span class="tg exp">suggestion only</span> = Signature schedule, offered on legs with no entry</p><div class="tw fhw"><table class="fht"><thead><tr>'+th("airport","Airport")+th("fbo","FBO")+th("aircraft","Aircraft")+th("fee","Fee")+th("wv","Waiver gal")+th("src","Source")+th("at","Updated")+th("by","By")+'</tr></thead><tbody>';
+function fhTableHtml(){try{return fhTableHtml0()}catch(x){if(typeof console!=="undefined")console.error(x);return '<div class="card bad">⚠️ Could not show the FBO Handling table: '+esc(x&&x.message||x)+' — <button class="lk" id="fhreload">reload the table from GitHub</button></div>'}}
+function fhNote(n){var d=fhData(),gv=(S.gh&&S.gh.v||{})["fbo-handling"],F=S.fhF||{},h="";
+ if(gv&&gv.err)h+='<div class="card bad">⚠️ FBO Handling table did not load: '+esc(gv.err)+' — <button class="lk" id="fhreload">try again</button></div>';
+ if(d.bad)h+='<p class="sm" style="color:var(--bad)">⚠️ '+d.bad+' row'+(d.bad>1?'s':'')+' skipped (could not be read)'+(d.badWhy?': '+esc(d.badWhy):'')+'</p>';
+ if(!n){var all=fhAll().length;if(all&&(F.q||F.ac||F.src))h+='<p class="sm">Filters hide all '+all+' rows. <button class="lk" id="fhfclr">Clear filters</button></p>';else if(!d.rows.length&&!(gv&&gv.err))h+='<p class="sm">No rows loaded yet'+(ghTok()?' — <button class="lk" id="fhreload">load from GitHub</button>':' — add a GitHub token in Setup to load the shared table')+'</p>'}return h}
+function fhTableHtml0(){var rs=fhView(),so=S.fhSort;FH_LAST=rs;var th=function(k,t){return '<th><button class="lk" data-fhsort="'+k+'">'+t+(so.k===k?(so.d>0?' ▲':' ▼'):'')+'</button></th>'};
+ var h=fhNote(rs.length)+'<p class="sm"><b>'+rs.length+'</b> row'+(rs.length===1?'':'s')+' · <span class="tg">in use</span> = what the planner applies · <span class="tg exp">suggestion only</span> = Signature schedule, offered on legs with no entry</p><div class="tw fhw"><table class="fht"><thead><tr>'+th("airport","Airport")+th("fbo","FBO")+th("aircraft","Aircraft")+th("fee","Fee")+th("wv","Waiver gal")+th("src","Source")+th("at","Updated")+th("by","By")+'</tr></thead><tbody>';
  rs.forEach(function(r,i){h+='<tr data-fhrow="'+i+'" class="'+(r.st==="in use"?"use":"sup")+'"><td><b>'+esc(r.airport)+'</b><br><span class="lsub">'+esc(fhCity(r.airport))+'</span></td><td>'+esc(r.fbo)+(r.note?'<br><span class="lsub">'+esc(r.note)+'</span>':'')+'</td><td>'+esc(r.aircraft)+'</td><td>'+(r.fee==null?'—':'$'+gal(r.fee))+'</td><td>'+(r.wv==null?'no waiver':gal(r.wv))+'</td><td>'+'<span class="srcb src-'+(r.tab?String(r.src).split(" ")[0].toLowerCase():"sug")+'">'+esc(r.src)+'</span>'+(r.imp?' <span class="tg new" title="changed in the last Signature import">changed in last import</span>':'')+'<br><span class="tg'+(r.st==="in use"?'':' exp')+'">'+r.st+'</span></td><td>'+(r.at?esc(pbDTxt(String(r.at).slice(0,10))):'—')+'</td><td>'+esc(r.by||'—')+'</td></tr>'});
  return h+'</tbody></table></div>'+(rs.length?'':'<p class="muted">No rows match the filter.</p>')}
 function fhSugg(icao){var s={};(PB.idx[icao]||[]).forEach(function(e){s[e.o.f]=1});fhAll().forEach(function(r){if(r.airport===icao)s[r.fbo]=1});return Object.keys(s).sort()}
@@ -1211,7 +1221,7 @@ function fhPageHtml(){var f=fhForm(),E=S.fhErr||{},g=ghCfg(),ic=f.apt?aptIcao(f.
  if(S.fhMsg)h+='<p class="sm" style="color:var(--ok)">✓ '+esc(S.fhMsg)+'</p>';
  h+='<p class="muted">'+(!ghTok()?'Saved on this device only — <button class="lk" data-goto="gh">add a GitHub token in Setup</button> to share. ':'')+(g.fhRO?'<button class="lk" data-goto="gh">Setup › GitHub token</button> ':'')+(g.fhErr?'⚠️ '+esc(g.fhErr):q?q+' change(s) waiting to be saved to GitHub':g.fhSaved?'Last saved '+ghWhen(g.fhSaved.at):'')+'</p></div>';
  h+='<div class="card"><div class="row"><button class="btn" id="fhtpl">Download template</button><button class="btn" id="fhimp">Import CSV</button><button class="btn" id="fhexp">Export CSV</button></div><input type="file" id="fhfile" accept=".csv,text/csv" style="display:none">'+fhPendHtml()+'<div class="row"><button class="btn pri" id="fhsigimp">Import Signature monthly CSV</button>'+(HS.list.some(function(x){return x.prof==="signature"})&&!fhData().rows.some(function(o){return fhSrcOf(o)==="Signature schedule"&&/^Signature base /.test(o.note||"")})?'<button class="btn" id="fhsigmig">Migrate current Signature file (one time)</button>':'')+'</div><input type="file" id="fhsigfile" accept=".csv,.xlsx,.xls,text/csv" style="display:none">'+(S.fhSigErr?'<p class="sm" style="color:var(--bad)">⚠️ '+esc(S.fhSigErr)+'</p>':'')+fhSigHtml()+'<p class="muted">Template columns: airport, fbo, aircraft (G650ER / Falcon 2000LXS / Both — aliases G650, GLF6, SJ, F2TH, HJ… accepted), handling_fee, waiver_gal (blank = no waiver), effective_date, note. The overrides master format is accepted too.</p></div>';
- h+='<div class="card"><b>Available handling data</b><div class="row3 fhf"><div><label>Filter</label><input data-p="fhF.q" value="'+esc(F.q)+'" placeholder="airport, FBO or city" autocapitalize="off"></div><div><label>Aircraft</label><select data-fhf="ac"><option value="">All</option>'+FH_ACS.map(function(a){return '<option'+(F.ac===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div><div><label>Source</label><select data-fhf="src"><option value="">All</option>'+["Manual","Leg card","Signature schedule","Signature file (suggestion)"].map(function(a){return '<option'+(F.src===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div></div><div id="fhtab">'+fhTableHtml()+'</div><p class="muted">Tap a row to load it into the form. This table is the primary source of handling fee and waiver gallons for every leg (per aircraft). Typing a fee or waiver on a leg card updates this table automatically. Each month: Import Signature monthly CSV → review the diff → Apply. Rows from the raw Signature file (suggestion) are only offered on a leg with no table entry. Direct fuel at KLBX, KMBS and KBTR is treated as no handling fee.</p></div>';
+ h+='<div class="card"><b>Available handling data</b><div class="row3 fhf"><div><label>Filter</label><input data-p="fhF.q" value="'+esc(F.q)+'" placeholder="airport, FBO or city" autocapitalize="off"></div><div><label>Aircraft</label><select data-fhf="ac"><option value="">All</option>'+FH_ACS.map(function(a){return '<option'+(F.ac===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div><div><label>Source</label><select data-fhf="src"><option value="">All</option>'+FH_SRCS.map(function(a){return '<option'+(F.src===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div></div><div id="fhtab">'+fhTableHtml()+'</div><p class="muted">Tap a row to load it into the form. This table is the primary source of handling fee and waiver gallons for every leg (per aircraft). Typing a fee or waiver on a leg card updates this table automatically. Each month: Import Signature monthly CSV → review the diff → Apply. Rows from the raw Signature file (suggestion) are only offered on a leg with no table entry. Direct fuel at KLBX, KMBS and KBTR is treated as no handling fee.</p></div>';
  return h}
 function goSetup(w){S.page='setup';if(w==='pb'||w==='gh')S.pbOpen=true;render();save();var e=(w==='gh'&&$('#ghtok'))||$('#sec-'+(w==='gh'?'pb':w));if(e&&e.scrollIntoView)e.scrollIntoView({block:'start'});else window.scrollTo(0,0)}
 function navHtml(){var p=S.page||"plan";return '<div class="seg nav">'+[["plan","Planner"],["fbo","FBO Handling"],["setup","Setup"]].map(function(x){return '<button data-page="'+x[0]+'" class="'+(p===x[0]?"on":"")+'">'+x[1]+'</button>'}).join("")+'</div>'}
