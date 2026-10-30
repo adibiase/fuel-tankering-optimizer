@@ -421,7 +421,7 @@ function pdfWt(b){return PDF_W[b?"b":"n"]}
 function pdfAscii(s){s=String(s==null?"":s).replace(/[→⟶]/g,"->").replace(/[·•]/g,"-").replace(/[—–−]/g,"-").replace(/≥/g,">=").replace(/≤/g,"<=").replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/…/g,"...").replace(/×/g,"x").replace(/[  ]/g," ").replace(/✓/g,"ok").replace(/⚠️?/g,"!");if(s.normalize)s=s.normalize("NFD").replace(/[̀-ͯ]/g,"");return s.replace(/[^ -~]/g,"?")}
 function pdfTw(s,sz,b){var w=pdfWt(b),t=0;s=pdfAscii(s);for(var i=0;i<s.length;i++){var c=s.charCodeAt(i)-32;t+=w[c]!=null?w[c]:556}return t*sz/1000}
 function pdfFit(s,sz,b,max){s=pdfAscii(s);if(pdfTw(s,sz,b)<=max)return s;while(s.length>1&&pdfTw(s+"..",sz,b)>max)s=s.slice(0,-1);return s+".."}
-function pdfWrap(s,sz,b,max){var w=pdfAscii(s).split(" "),L=[],c="";w.forEach(function(x){var t=c?c+" "+x:x;if(pdfTw(t,sz,b)>max&&c){L.push(c);c=x}else c=t});if(c)L.push(c);return L.map(function(l){return pdfFit(l,sz,b,max)})}
+function pdfWrap(s,sz,b,max){var w=pdfAscii(s).split(" "),L=[],c="";w.forEach(function(x){while(pdfTw(x,sz,b)>max&&x.length>1){var k=x.length-1;while(k>1&&pdfTw(x.slice(0,k),sz,b)>max)k--;if(c){L.push(c);c=""}L.push(x.slice(0,k));x=x.slice(k)}var t=c?c+" "+x:x;if(pdfTw(t,sz,b)>max&&c){L.push(c);c=x}else c=t});if(c)L.push(c);return L.length?L:[""]}   // wraps; long words are broken, never truncated
 function pdfEsc(s){return pdfAscii(s).replace(/[\\()]/g,function(c){return "\\"+c})}
 function PdfPage(){var o=[],f=function(n){return (Math.round(n*100)/100).toString()};return{ops:o,
  text:function(x,y,s,sz,b,col,al){s=pdfAscii(s);if(al==="r")x-=pdfTw(s,sz,b);else if(al==="c")x-=pdfTw(s,sz,b)/2;o.push((col||"0 0 0")+" rg BT /"+(b?"F2":"F1")+" "+f(sz)+" Tf "+f(x)+" "+f(y)+" Td ("+pdfEsc(s)+") Tj ET")},
@@ -449,35 +449,36 @@ function pdfData(r,now){var a=acNow(),P=wvPlans(r),stops=[],warn=[],src={};now=n
  if(P&&P.mins&&!P.mins.infeasible&&P.mins.wshort)P.mins.wshort.forEach(function(i){warn.push("All-minimums scenario: "+P.mins.legs[i].from+" waiver minimum can't be reached (tank / weight limit)")});
  var tot=stops.reduce(function(s,x){return s+x.total},0),auto=P?wvTot(P.auto):tot,mins=P&&!P.mins.infeasible?wvTot(P.mins):null;
  return{title:"Fuel Tankering Plan",route:routeStr().split("-"),ac:a.name,trip:S.trip||"",gen:now,src:Object.keys(src).filter(Boolean).map(function(k){return k+(src[k]?" ("+src[k]+")":"")}),
-  stops:stops,total:tot,baseline:r.baseline,savBase:r.baseline-tot,mins:mins,savMins:mins==null?null:mins-tot,auto:auto,ovr:stops.some(function(s){return s.ovr}),gal:stops.reduce(function(s,x){return s+x.u},0),warn:warn,start:startGal(),arr:r.rows[r.rows.length-1].arr}}
+  stops:stops,total:tot,baseline:r.baseline,savBase:r.baseline-tot,mins:mins,savMins:mins==null?null:mins-tot,auto:auto,ovr:stops.some(function(s){return s.ovr}),gal:stops.reduce(function(s,x){return s+x.u},0),warn:warn,start:startGal(),dens:dens(),arr:r.rows[r.rows.length-1].arr}}
 function pdfReport(r,now){var D=pdfData(r,now),pg=PdfPage(),M=36,W=612-2*M,y=792-M,n=D.stops.length,dk="0.12 0.22 0.39",gr="0.42 0.45 0.5",lg="0.93 0.94 0.96",ok="0.1 0.5 0.25",bad="0.75 0.15 0.12",d=new Date(D.gen);
- var mo=function(v){return v==null?"n/a":"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})},gl=function(v){return Math.round(v).toLocaleString("en-US")};
+ var mo=function(v){return v==null?"n/a":(v<0?"-$":"$")+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})},gl=function(v){return Math.round(v).toLocaleString("en-US")};
  // header
  pg.rect(0,792-6,612,6,dk);pg.text(M,y-14,D.title,20,true,dk);pg.text(612-M,y-12,dmy(D.gen)+" "+p2(d.getHours())+":"+p2(d.getMinutes()),9,false,gr,"r");
- y-=34;pg.text(M,y,D.route.join("  ->  "),13,true);y-=15;pg.text(M,y,D.ac+(D.trip?"  -  "+D.trip:"")+"  -  start fuel "+gl(D.start)+" gal",9.5,false,gr);
+ y-=34;pg.text(M,y,D.route.join("  ->  "),13,true);y-=15;pg.text(M,y,D.ac+(D.trip?"  -  "+D.trip:"")+"  -  Start fuel: "+gl(D.start)+" gal ("+gl(D.start*D.dens)+" lb at "+D.dens+" lb/gal)",9.5,false,gr);
  y-=12;pdfWrap("Prices: "+(D.src.length?D.src.join("; "):"entered manually"),8,false,W).slice(0,2).forEach(function(l){pg.text(M,y,l,8,false,gr);y-=10});
  // totals boxes
  y-=6;var bx=[["Total cost",mo(D.total),dk],["Savings vs need-only baseline",mo(D.savBase),D.savBase>=0?ok:bad],["Savings vs all waiver minimums",D.savMins==null?"n/a":mo(D.savMins),D.savMins==null||D.savMins>=0?ok:bad],["Fuel to buy",gl(D.gal)+" gal",dk]],bw=(W-3*8)/4;
  bx.forEach(function(b,i){var x=M+i*(bw+8);pg.rect(x,y-40,bw,40,lg);pg.text(x+8,y-13,b[0],7.5,false,gr);pg.text(x+8,y-31,b[1],13,true,b[2])});y-=48;
  pg.text(M,y-2,"Need-only baseline "+mo(D.baseline)+"   -   All waiver minimums "+mo(D.mins)+(D.ovr?"   -   Optimizer (Auto) "+mo(D.auto)+"; current overrides "+(D.total-D.auto>=0?"+":"-")+mo(Math.abs(D.total-D.auto)):""),8,false,gr);y-=16;
- // table
- var C=[["Airport",0,"l"],["FBO / provider",48,"l"],["Price / tier",168,"l"],["Gal to buy",262,"r"],["Fuel cost",320,"r"],["Handling fee",328,"l"],["Strategy",420,"l"],["Stop total",W,"r"]],rh=n>4?24:28,fs=n>4?8:8.5;
- pg.rect(M,y-16,W,16,dk);C.forEach(function(c){pg.text(M+c[1]+(c[2]==="r"?-4:4),y-11,c[0],7.5,true,"1 1 1",c[2])});y-=16;
- D.stops.forEach(function(s,i){if(i%2)pg.rect(M,y-rh,W,rh,"0.97 0.97 0.98");var y1=y-11,y2=y-21,X=function(k){return M+C[k][1]+4};
-  pg.text(X(0),y1,s.apt,fs+0.5,true);pg.text(X(0),y2,"Leg "+(i+1),7,false,gr);
-  pg.text(X(1),y1,pdfFit(s.fbo||"-",fs,false,112),fs);if(s.prov)pg.text(X(1),y2,pdfFit(s.prov,7,false,112),7,false,gr);
-  pg.text(X(2),y1,"$"+s.price.toFixed(2)+"/gal",fs);if(s.tier)pg.text(X(2),y2,pdfFit(s.tier,7,false,88),7,false,gr);
-  pg.text(M+C[3][1]-4,y1,gl(s.u),fs,true,null,"r");pg.text(M+C[4][1]-4,y1,mo(s.fuel),fs,false,null,"r");
-  pg.text(X(5),y1,s.feeList>0?(s.waived?"Waived":mo(s.fee)+" paid"):"None",fs,s.feeList>0,s.waived?ok:s.feeList>0?bad:gr);
-  if(s.feeList>0)pg.text(X(5),y2,s.noWaiver?"No waiver available":"fee $"+gl(s.feeList)+", waive "+gl(Math.ceil(s.w))+" gal",7,false,gr);
-  pg.text(X(6),y1,s.strat+(s.ovr?" *":""),fs,s.ovr,s.ovr?"0.45 0.28 0.75":null);pg.text(X(6),y2,pdfFit(s.dec,7,false,W-C[6][1]-60),7,false,s.wshort?bad:gr);
-  pg.text(M+W-4,y1,mo(s.total),fs,true,null,"r");y-=rh});
- pg.line(M,y,M+W,y,dk,1);y-=13;pg.text(M+4,y,"Trip total",9,true);pg.text(M+C[3][1]-4,y,gl(D.gal),9,true,null,"r");pg.text(M+W-4,y,mo(D.total),9,true,dk,"r");
- if(D.ovr){y-=11;pg.text(M+4,y,"* strategy overridden by the user (not Auto)",7,false,"0.45 0.28 0.75")}y-=18;
- // compact fuel-to-buy bars (only if room)
- var foot=M+14,need=14+n*13+10,wl=D.warn.length?18+Math.min(D.warn.length,8)*10:0;
- if(y-need-wl>foot){pg.text(M,y,"Fuel to buy at each airport",9.5,true,dk);y-=12;var mx=Math.max.apply(null,D.stops.map(function(s){return s.u}).concat([1])),bw2=W-120;
-  D.stops.forEach(function(s){pg.text(M,y-8,s.apt,8,true);if(s.u>0)pg.rect(M+44,y-10,Math.max(1,bw2*s.u/mx),9,s.strat==="Auto"?"0.24 0.47 0.75":"0.45 0.28 0.75");pg.text(M+48+(s.u>0?bw2*s.u/mx:0),y-8,s.u>0?gl(s.u)+" gal":"no buy",8,false,gr);y-=13});y-=10}
+ // table: every cell wraps (nothing truncated); font shrinks 8.5 -> 6.5 pt to fit; the chart is dropped before anything else
+ var C=[["Airport",0,42,"l"],["FBO / provider",42,96,"l"],["Price / tier",138,56,"l"],["Gal to buy",194,48,"r"],["Fuel cost",242,56,"r"],["Handling fee",298,92,"l"],["Strategy / decision",390,90,"l"],["Stop total",480,60,"r"]],pur="0.45 0.28 0.75";
+ var cells=function(s,i,fs){var sm=Math.max(6.5,fs-1.5),c=[[[s.apt,fs+0.5,true],["Leg "+(i+1),sm,false,gr]],[[s.fbo||"-",fs,false]].concat(s.prov?[[s.prov,sm,false,gr]]:[]),
+   [["$"+s.price.toFixed(2)+"/gal",fs,false]].concat(s.tier?[[s.tier,sm,false,gr]]:[]),[[gl(s.u),fs,true],[gl(s.u*D.dens)+" lb",sm,false,gr]],[[mo(s.fuel),fs,false]],
+   [[s.feeList>0?(s.waived?"Waived":mo(s.fee)+" paid"):"None",fs,s.feeList>0,s.waived?ok:s.feeList>0?bad:gr]].concat(s.feeList>0?[[s.noWaiver?"No waiver available":"fee $"+gl(s.feeList)+", waive "+gl(Math.ceil(s.w))+" gal",sm,false,gr]]:[]),
+   [[s.strat+(s.ovr?"*":""),fs,s.ovr,s.ovr?pur:null],[s.dec,sm,false,s.wshort?bad:gr]],[[mo(s.total),fs,true]]];
+  return c.map(function(cl,k){var out=[];cl.forEach(function(q){pdfWrap(q[0],q[1],q[2],C[k][2]-8).forEach(function(t){out.push([t,q[1],q[2],q[3]])})});return out})};
+ var rowH=function(cs){return 6+Math.max.apply(null,cs.map(function(cl){return cl.reduce(function(h,q){return h+q[1]*1.18},0)}))};
+ var foot=M+14,wMin=D.warn.length?12+Math.min(D.warn.length,3)*10+6:0,chartH=14+n*13+10,tail=13+(D.ovr?11:0)+18,fs=8.5,R0,TH,chart=true;
+ for(;;){R0=D.stops.map(function(s,i){return cells(s,i,fs)});TH=16+R0.reduce(function(h,cs){return h+rowH(cs)},0)+tail;if(y-TH-chartH-wMin>=foot||fs<=6.5)break;fs=Math.max(6.5,fs-0.25)}
+ if(y-TH-chartH-wMin<foot)chart=false;
+ pg.rect(M,y-16,W,16,dk);C.forEach(function(c){pg.text(c[3]==="r"?M+c[1]+c[2]-4:M+c[1]+4,y-11,c[0],7.5,true,"1 1 1",c[3])});y-=16;
+ R0.forEach(function(cs,i){var rh=rowH(cs);if(i%2)pg.rect(M,y-rh,W,rh,"0.97 0.97 0.98");
+  cs.forEach(function(cl,k){var yy=y-3;cl.forEach(function(q){yy-=q[1]*1.18;pg.text(C[k][3]==="r"?M+C[k][1]+C[k][2]-4:M+C[k][1]+4,yy+q[1]*0.25,q[0],q[1],q[2],q[3],C[k][3])})});y-=rh});
+ pg.line(M,y,M+W,y,dk,1);y-=13;pg.text(M+4,y,"Trip total",9,true);pg.text(M+C[3][1]+C[3][2]-4,y,gl(D.gal),9,true,null,"r");pg.text(M+W-4,y,mo(D.total),9,true,dk,"r");
+ if(D.ovr){y-=11;pg.text(M+4,y,"* strategy overridden by the user (not Auto)",7,false,pur)}y-=18;
+ // compact fuel-to-buy bars (only if they fit with the table at a readable size)
+ if(chart){pg.text(M,y,"Fuel to buy at each airport",9.5,true,dk);y-=12;var mx=Math.max.apply(null,D.stops.map(function(s){return s.u}).concat([1])),bw2=W-150;
+  D.stops.forEach(function(s){pg.text(M,y-8,s.apt,8,true);if(s.u>0)pg.rect(M+44,y-10,Math.max(1,bw2*s.u/mx),9,s.strat==="Auto"?"0.24 0.47 0.75":pur);pg.text(M+48+(s.u>0?bw2*s.u/mx:0),y-8,s.u>0?gl(s.u)+" gal ("+gl(s.u*D.dens)+" lb)":"no buy",8,false,gr);y-=13});y-=10}
  // warnings (always fit: truncated to the room left)
  if(D.warn.length){pg.text(M,y,"Warnings and flags",9.5,true,bad);y-=12;var lines=[];D.warn.forEach(function(w){pdfWrap("- "+w,8,false,W).forEach(function(l){lines.push(l)})});
   var room=Math.max(1,Math.floor((y-foot-4)/10));if(lines.length>room){lines=lines.slice(0,room-1);lines.push("... "+(D.warn.length)+" warnings in total - see the app")}lines.forEach(function(l){pg.text(M,y,l,8);y-=10})}
