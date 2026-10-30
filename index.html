@@ -186,7 +186,7 @@ function optimize(inp){
   out.altSavings=alt-best.obj;
   return out;}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.10.30.0922b",APP_BUILT="2026-10-30 09:22";
+var APP_VERSION="2026.10.30.0934",APP_BUILT="2026-10-30 09:34";
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -282,7 +282,8 @@ function tripHint(l){return (l.tripManual?'<span class="tg man">manual</span> <b
 function resHint(l){return '≈ '+gal(resLb(l)/dens())+' gal · '+(resLb(l)<RES_LB?'<span style="color:var(--warn)">below 5,000 lb minimum</span>':'default 5,000 lb')}
 function wvHint(l){return blank(l.waiver)?'':'≈ '+gal(num(l.waiver)*dens())+' lb'}
 S.credit=0;S.aircraft.forEach(function(a){var d=WDEF[a.name];if(d&&a.mtow==null)for(var k in d)a[k]=d[k];if(d&&((a.name==='Gulfstream G650ER'&&+a.payload===1600)||(a.name==='Dassault Falcon 2000LXS'&&+a.payload===1200)))a.payload=0});if(!S.view)S.view="auto";if(S.setOpen==null)S.setOpen=false;S.legs.forEach(function(l){delete l.dep;l.from=icaoNorm(l.from);l.to=icaoNorm(l.to);["from","to"].forEach(function(f){if(l[f+"T"]!=null)l[f+"T"]=icaoNorm(l[f+"T"]);var t=l[f+"T"]||l[f];if(t)l[f]=aptIcao(t)});if(l.hoursManual==null)l.hoursManual=!blank(l.hours);if(l.tripManual==null)l.tripManual=!blank(l.trip)});
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="ovBusy"||k==="fhBusy"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
+ovPurge();   // drop overrides-era saved state (status, errors, toggles, cached rows)
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="fhBusy"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
 if(S&&S.gh){delete S.gh.busy;delete S.gh.ovBusy;delete S.gh.runId}   // stale "Checking…" from a run killed mid-check (page closed / iOS suspended) used to lock the button forever
 var $=function(s){return document.querySelector(s)};
 function money(v){return v==null?"n/a":"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -629,14 +630,6 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
  else if(t.id==="ghshow")PB.ghShow=!PB.ghShow;
  else if(t.id==="ghclr"){ghSetTok("");PB.ghShow=false}
  else if(t.id==="toastx")ghCfg().toast=null;
- else if((d=t.getAttribute("data-ovsave"))!=null)ovSaveLeg(+d);
- else if((d=t.getAttribute("data-ovreset"))!=null){var lo=S.legs[+d];lo.ovOff=true;lo.ovMan={};lo.feeManual=lo.waiverManual=false}
- else if((d=t.getAttribute("data-ovuse"))!=null){S.legs[+d].ovOff=false}
- else if((d=t.getAttribute("data-ovclr"))!=null){if(typeof confirm==="function"&&!confirm("Clear this shared override for everyone?"))return;ovClearLeg(+d)}
- else if(t.id==="ovimp"){var fo=$("#pbfile");if(fo){fo.value="";fo.click()}return}
- else if(t.id==="ovimpok")ovImportOk();
- else if(t.id==="ovimpx")PB.ovPending=null;
- else if(t.id==="ovdl"){var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(ovCsv(ovData().rows));a.download="overrides_latest.csv";document.body.appendChild(a);a.click();document.body.removeChild(a);return}
  else if(t.id==="ghnow"){ghPoll(true,function(){render();save()})}
  else if(t.id==="ghref"||t.id==="ghlist"){var te=$("#ghtok");if(te&&te.value!=null&&String(te.value).trim()!==ghTok())ghSetTok(String(te.value).trim());var f0=t.id==="ghref"?function(cb){ghSync(true,cb)}:ghList;f0(function(){ghCfg().busy=false;render();save()});ghCfg().busy=t.id==="ghref";}
  else if(t.id==="pbimp"){var fi=$("#pbfile");if(fi){fi.value="";fi.click()}return}
@@ -755,7 +748,7 @@ function pbDb(cb){var I=typeof indexedDB!=="undefined"?indexedDB:null;if(!I){cb(
   q.onblocked=function(){ret(null)};setTimeout(function(){ret(null)},8000)}catch(e){cb(null)}}   // blocked upgrade (old tab open) / stuck open → in-memory fallback instead of hanging
 function pbIndex(){PB.idx={};PB.vendors.forEach(function(v){v.offers.forEach(function(o){(PB.idx[o.a]=PB.idx[o.a]||[]).push({v:v,o:o})})})}
 function pbLoad(cb){pbDb(function(db){if(!db){cb&&cb();return}try{var out=[],cur=db.transaction("vendors","readonly").objectStore("vendors").openCursor();
- cur.onsuccess=function(){var c=cur.result;if(c){out.push(c.value);c.continue()}else{var have={};PB.vendors.forEach(function(v){have[v.id]=1});HS.list=HS.list.concat(out.filter(function(v){return v.kind==="handling"&&!HS.list.some(function(x){return x.id===v.id})}));out=out.filter(function(v){return v.kind!=="handling"});PB.vendors=PB.vendors.concat(out.filter(function(v){return !have[v.id]}));pbIndex();pbRefreshLegs();cb&&cb()}};cur.onerror=function(){cb&&cb()}}catch(e){cb&&cb()}})}
+ cur.onsuccess=function(){var c=cur.result;if(c){out.push(c.value);c.continue()}else{var have={};PB.vendors.forEach(function(v){have[v.id]=1});HS.list=HS.list.concat(out.filter(function(v){return v.kind==="handling"&&!HS.list.some(function(x){return x.id===v.id})}));var stale=out.filter(function(v){return v.src&&ghIgnored(String(v.src.path||"").split("/")[0])});stale.forEach(function(v){try{db.transaction("vendors","readwrite").objectStore("vendors").delete(v.id)}catch(e){}});out=out.filter(function(v){return v.kind!=="handling"&&stale.indexOf(v)<0});PB.vendors=PB.vendors.concat(out.filter(function(v){return !have[v.id]}));pbIndex();pbRefreshLegs();cb&&cb()}};cur.onerror=function(){cb&&cb()}}catch(e){cb&&cb()}})}
 function pbPut(v,cb){PB.vendors=PB.vendors.filter(function(x){return x.id!==v.id}).concat([v]);pbIndex();pbRefreshLegs();cb&&cb();  // in memory now; saved to IndexedDB in the background
  pbDb(function(db){if(!db)return;try{var tx=db.transaction("vendors","readwrite");tx.objectStore("vendors").put(v);tx.onerror=function(){PB.err="Could not save the price book on this device (storage full or private mode) — it will be gone after reload.";render()}}catch(e){}})}
 function pbDel(id,cb){PB.vendors=PB.vendors.filter(function(x){return x.id!==id});pbIndex();
@@ -785,7 +778,7 @@ function pbHead(e){var p=pbProv(e.v),f=pbFboTxt(p,e.o.f);return f===p||f.toLower
 function pbShortLab(e,l){var o=e.o,ap=l&&l._ap&&l.pb&&l.pb.k===pbKey(e)?l._ap.tp:null,b=pbBest(o.t),f=pbFboTxt(pbProv(e.v),o.f);return (f===pbProv(e.v)?f:pbTrunc(f,30))+" · $"+(ap!=null?ap:b[1]).toFixed(2)}
 function pbOptLab(e,multi){var o=e.o,t=o.t,b=pbBest(t);return pbTrunc(pbHead(e),40)+(o.x?" +additive":"")+(o.p!=="JET FUEL"&&!o.x?" ("+o.p+")":"")+" · $"+t[0][1].toFixed(2)+(b!==t[0]?" → $"+b[1].toFixed(2)+" @"+pbTierLab(b[0]):"")+(o.d&&o.d<pbToday()?" · expired":"")+(o.ef&&o.ef>pbToday()?" · from "+pbDTxt(o.ef,1):"")+(pbStale(o)?" · older than "+(o.sd||14)+" days":"")}
 function pbSnap(e){return{k:pbKey(e),v:pbSrcTxt(e.v),prov:pbProv(e.v),vid:e.v.id,f:e.o.f,p:e.o.p,x:e.o.x,d:e.o.d,r:e.o.r||null,sd:e.o.sd||null,info:e.o.info||null,fn:e.o.fn||null,note:e.o.note||null,ef:e.o.ef||null,sb:e.o.sb||null,dir:e.o.dir||0,lit:e.o.lit||0,t:e.o.t.map(function(t){return t[2]>0?[t[0],t[1],t[2]]:[t[0],t[1]]}),fe:e.o.fe}}
-function pbPick(i,key){var l=S.legs[i];if(!l)return;l.ovMan={};l.ovOff=false;delete l.pbPrev;
+function pbPick(i,key){var l=S.legs[i];if(!l)return;l.ovMan={};delete l.pbPrev;
  var wasSched=!!(l.hdl&&l.hdl.st==="ok"),clr=function(){l.fee="";l.waiver="";l.noWaiver=false;l.feeManual=l.waiverManual=false;delete l.hdl};
  if(key&&key.indexOf("fh|")===0){var wsh=wasSched;delete l.pb;l.fhFbo=key.slice(3);if(wsh)clr();l.feeManual=l.waiverManual=false;return}delete l.fhFbo;
  if(!key||key==="manual"){delete l.pb;if(wasSched)clr();return}                         // leaving Signature → blank fee + waiver
@@ -836,7 +829,7 @@ function pbSection(){var nA=Object.keys(PB.idx).length,h='<h2><button class="set
  if(PB.pending)h+=pbMapHtml();if(PB.last)h+=pbSumHtml(PB.last.sum,PB.last.name);h+=hdlSection();
  return h+'</div>'}
 function pbHandleText(text,file,cb){pbHandleRows(csvParse(text),file,cb)}
-function pbHandleRows(rows,file,cb){PB.err=null;PB.last=null;PB.pending=null;HS.last=null;if(ovDetect(rows)){PB.ovPending=ovDiff(rows);cb&&cb();return}if(importRows(rows,file,function(){cb&&cb()}))return;if(!rows.length){PB.err="That file is empty.";cb&&cb();return}
+function pbHandleRows(rows,file,cb){PB.err=null;PB.last=null;PB.pending=null;HS.last=null;if(importRows(rows,file,function(){cb&&cb()}))return;if(!rows.length){PB.err="That file is empty.";cb&&cb();return}
  var p=pbDetect(rows);if(p){var v=pbBuild(rows,p,{received:p.fileDate?pbFileDate(file):null});v.file=file||"";PB.last=v;pbPut(v,cb);return}
  var n=0;rows.slice(0,30).forEach(function(r){n=Math.max(n,r.length)});PB.pending={rows:rows.slice(0,6),all:rows,ncol:n,file:file,map:{},header:false,codeType:"auto",name:""};cb&&cb()}
 function pbSaveMap(){var P=PB.pending,cols={};for(var c in P.map)if(P.map[c]&&P.map[c]!=="ignore")cols[P.map[c]]=P.header?String(P.all[0][c]||"").trim():+c;
@@ -930,6 +923,11 @@ function hdlRebuild(){HS.list=HS.list.map(function(v){var p=HDL_BUILTIN.filter(f
 var GH_KEY="tankering.ghtoken",GH_EVERY=6*3600e3,GH_API="https://api.github.com/repos/";
 function ghTok(){try{return localStorage.getItem(GH_KEY)||""}catch(e){return""}}
 function ghSetTok(v){try{if(v)localStorage.setItem(GH_KEY,v);else localStorage.removeItem(GH_KEY)}catch(e){}}
+/* folders the app never reads (shared overrides retired 2026-10-30; the repo folder was deleted) */
+function ghIgnored(f){return /^overrides$/i.test(String(f||""))}
+/* one-time clean-up of saved state from the overrides era: folder status/errors/toggles, cached rows, queues, leg flags */
+function ovPurge(){var g=S.gh;if(g){if(g.v)Object.keys(g.v).forEach(function(f){if(ghIgnored(f))delete g.v[f]});if(Array.isArray(g.folders))g.folders=g.folders.filter(function(f){return !ghIgnored(f)});if(g.err&&/overrides/i.test(g.err))g.err=null;if(g.msg&&/overrides/i.test(g.msg))g.msg=String(g.msg).split(" · ").filter(function(x){return !/overrides/i.test(x)}).join(" · ");if(g.autoErr&&/overrides/i.test(g.autoErr))g.autoErr=null;["ovRO","ovSaved","ovErr","ovBusy"].forEach(function(k){delete g[k]})}
+ ["ovData","ovQ","ovPending"].forEach(function(k){delete S[k]});(S.legs||[]).forEach(function(l){["ovOff","ovSrc","ovr","ovPrice","acMan","acCur"].forEach(function(k){delete l[k]})})}
 function ghCfg(){var g=S.gh=S.gh||{};if(!g.repo)g.repo="adibiase/fuel-prices";if(!g.branch)g.branch="main";g.v=g.v||{};return g}
 function ghOnline(){return !(typeof navigator!=="undefined"&&navigator&&navigator.onLine===false)}
 var GH_TIMEOUT_MS=20000,GH_CHECK_MS=120000;
@@ -951,7 +949,7 @@ function ghFetch(path,accept,cb0,bin,hdrs){var g=ghCfg(),off={off:true,msg:"Offl
 function ghWhen(t){var d=new Date(t);return pbDTxt(d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate()))+" "+p2(d.getHours())+":"+p2(d.getMinutes())}
 /* list vendor folders: top-level dirs, each expected to hold latest.csv */
 function ghList(cb){ghFetch("contents/","application/vnd.github+json",function(e,d){var g=ghCfg();if(e){g.err=e.msg;cb&&cb(e);return}
- g.folders=(Array.isArray(d)?d:[]).filter(function(x){return x.type==="dir"&&x.name.charAt(0)!=="."}).map(function(x){return x.name});
+ g.folders=(Array.isArray(d)?d:[]).filter(function(x){return x.type==="dir"&&x.name.charAt(0)!=="."&&!ghIgnored(x.name)}).map(function(x){return x.name});
  g.folders.forEach(function(f){if(!g.v[f])g.v[f]={on:true}});g.err=null;cb&&cb(null)})}
 /* check + download changed files, import through the profile pipeline */
 function ghSync(force,cb1){var g=ghCfg();if(!ghTok()){g.err="Paste a GitHub token first.";cb1&&cb1();return}
@@ -959,7 +957,7 @@ function ghSync(force,cb1){var g=ghCfg();if(!ghTok()){g.err="Paste a GitHub toke
  wd=setTimeout(function(){if(fin)return;g.err="Check timed out after "+GH_CHECK_MS/1000+" s"+(cur?" while loading "+cur+"/latest":"")+" — files already loaded were kept. Tap Refresh to try again.";g.msg=log.concat(cur?[cur+": timed out"]:[]).join(" · ");if(cur&&g.v[cur])g.v[cur].err="timed out";g.lastCheck=Date.now();cb()},GH_CHECK_MS);if(wd&&wd.unref)wd.unref();
  var log=[],cur=null;g.err=null;
  g.busy=true;ghList(function(e){if(fin)return;if(e){g.lastCheck=Date.now();cb();return}
-  var todo=g.folders.filter(function(f){return g.v[f].on&&f!=="overrides"});   // shared overrides retired: FBO Handling table is primary
+  var todo=g.folders.filter(function(f){return g.v[f]&&g.v[f].on});
   (function next(){if(fin)return;if(!todo.length){cur=null;g.lastCheck=Date.now();g.msg=log.join(" · ");var bad=todo.length||Object.keys(g.v).filter(function(f){return g.v[f].on&&g.v[f].err});g.err=bad.length?"Some files did not load: "+bad.map(function(f){return f+" ("+g.v[f].err+")"}).join("; "):null;cb();return}var f=cur=todo.shift(),gv=g.v[f];
    var fail=function(msg){gv.err=msg;log.push(f+": "+msg);next()};   // one bad file never blocks the others
    ghFetch("contents/"+encodeURIComponent(f),"application/vnd.github+json",function(e,d){if(fin)return;if(e){fail(e.msg);return}
@@ -972,9 +970,8 @@ function ghSync(force,cb1){var g=ghCfg();if(!ghTok()){g.err="Paste a GitHub toke
      if(fin)return;if(e&&(e.status===401||e.off||e.timeout)){fail(e.msg);return}
      ghFetch("git/blobs/"+ent.sha,"application/vnd.github.raw",function(e2,t2){if(fin)return;if(e2||!t2){fail((e2||{}).msg||"download failed");return}done(t2)},bin)},bin)};
     var done=function(data){var rows;Promise.resolve().then(function(){return fileRows(ent.name,data)}).then(function(r){rows=r}).then(function(){if(fin)return;done2(rows)}).catch(function(er){if(fin)return;if(typeof console!=="undefined")console.error(er);fail("could not read "+f+"/"+ent.name+": "+(er&&er.message||er))})};
-    var done2=function(rows){if(f==="overrides"&&!ovDetect(rows)){var lk=pbDetect(rows);fail("overrides/latest.csv is not an overrides file"+(lk?" (it looks like a "+lk.name+" price file)":"")+" — not imported; put the overrides master (airport,fbo,aircraft,fuel_price,…) there");return}
+    var done2=function(rows){
      if(fhDetect(rows)){fhLoadRows(rows,ent.sha);gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.name="FBO handling";gv.err=null;g.err=null;log.push(f+": updated");next();return}
-     if(ovDetect(rows)){ovLoadRows(rows,ent.sha);gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.name="Shared overrides";gv.err=null;g.err=null;log.push(f+": updated");next();return}
      var hv=importRows(rows,f+"/"+ent.name);if(hv){hv.src={gh:g.repo,branch:g.branch,path:f+"/"+ent.name,sha:ent.sha,at:Date.now()};hdlPut(hv);gv.sha=ent.sha;gv.at=Date.now();gv.checked=gv.at;gv.profile="h_"+hv.prof;gv.name=hv.name;gv.err=null;g.err=null;log.push(f+": updated");next();return}
      var p=pbDetect(rows)||pbProfiles().filter(function(x){return x.id===gv.profile})[0];
      if(!p){PB.pending={rows:rows.slice(0,6),all:rows,ncol:Math.max.apply(null,rows.slice(0,30).map(function(r){return r.length}).concat([0])),file:"GitHub "+f+"/latest.csv",map:{},header:false,codeType:"auto",name:f,gh:{f:f,sha:ent.sha}};gv.err="layout not recognised — map the columns below";log.push(f+": needs column mapping");next();return}
@@ -997,7 +994,7 @@ function ghPoll(manual,cb){var g=ghCfg();if(!ghTok()){g.autoErr="Paste a GitHub 
   if(e&&e.status===304){g.fail=0;g.nextAt=0;g.autoErr=null;g.polled=ghNow();cb&&cb(false);return}
   if(e){ghBack(g,e);cb&&cb(false);return}
   g.fail=0;g.nextAt=0;g.autoErr=null;g.polled=ghNow();if(meta&&meta.etag)g.etag=meta.etag;
-  var ch=[],seen={};((d&&d.tree)||[]).forEach(function(x){var m=x.type==="blob"&&String(x.path).match(/^([^\/.][^\/]*)\/latest\.(csv|xlsx)$/i);if(!m||seen[m[1]]||m[1]==="overrides")return;seen[m[1]]=1;var f=m[1],gv=g.v[f];
+  var ch=[],seen={};((d&&d.tree)||[]).forEach(function(x){var m=x.type==="blob"&&String(x.path).match(/^([^\/.][^\/]*)\/latest\.(csv|xlsx)$/i);if(!m||seen[m[1]]||ghIgnored(m[1]))return;seen[m[1]]=1;var f=m[1],gv=g.v[f];
    if(!gv){gv=g.v[f]={on:true}}if(gv.on&&gv.sha!==x.sha)ch.push(f)});
   g.folders=Object.keys(seen).sort();
   if(!ch.length){cb&&cb(false);return}
@@ -1015,82 +1012,23 @@ function ghStart(){var tick=function(){ghTick(function(ch){if(ch){render();save(
  if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!ghHidden()){tick();updCheck()}});
  if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("focus",tick);
  if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("online",tick)}
-/* ---- Shared FBO overrides (private repo overrides/latest.csv): fuel price / handling fee / waiver gal per airport + FBO (+ aircraft) ---- */
-var OV_COLS=["airport","fbo","aircraft","fuel_price","handling_fee","waiver_gal","updated_at","updated_by","note"],OV_PATH="overrides/latest.csv",OV_F=["fuel_price","handling_fee","waiver_gal"];
-function ovData(){var d=S.ovData=S.ovData||{rows:[],sha:null};d.rows=d.rows||[];return d}
-function ovQ(){return S.ovQ=S.ovQ||[]}
-function ovDetect(rows){var h=(rows[0]||[]).map(function(x){return String(x==null?"":x).trim().toLowerCase()});return ["airport","fbo","aircraft","fuel_price","handling_fee","waiver_gal"].every(function(c){return h.indexOf(c)>=0})}
-function ovNumOrNull(v){v=String(v==null?"":v).trim();if(v==="")return null;var n=pbNum(v);return isFinite(n)?n:null}
-function ovParse(rows){var h=(rows[0]||[]).map(function(x){return String(x==null?"":x).trim().toLowerCase()}),out=[];
- rows.slice(1).forEach(function(r){if(!r||r.every(function(c){return String(c||"").trim()===""}))return;var o={};OV_COLS.forEach(function(c){var j=h.indexOf(c);o[c]=j>=0&&r[j]!=null?String(r[j]).trim():""});
-  o.airport=o.airport.toUpperCase();o.aircraft=ovAcNorm(o.aircraft);OV_F.forEach(function(f){o[f]=ovNumOrNull(o[f])});if(o.airport&&o.fbo)out.push(o)});return out}
-function ovKey(o){return String(o.airport).toUpperCase()+"|"+String(o.fbo).trim().toLowerCase()+"|"+String(o.aircraft||"").trim().toLowerCase()}
+/* ---- shared GitHub write helpers (used by the FBO Handling table) ---- */
 function ovCell(v){v=v==null?"":String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
-function ovCsv(rows){return OV_COLS.join(",")+"\n"+(rows||[]).slice().sort(function(a,b){return ovKey(a)<ovKey(b)?-1:1}).map(function(o){return OV_COLS.map(function(c){return ovCell(o[c])}).join(",")}).join("\n")+((rows||[]).length?"\n":"")}
-function ovAcShort(n){return String(n||"").replace(/^(gulfstream|dassault|bombardier|cessna|embraer|textron)\s+/i,"").trim()}
-function ovAcMatch(rowAc,acName){rowAc=String(rowAc||"").trim().toLowerCase();return !!rowAc&&String(acName||"").toLowerCase().indexOf(rowAc)>=0}
-/* merged override for airport+FBO: aircraft-specific values beat all-aircraft values (field by field) */
-function ovFind(apt,fbo,acName){acName=ovAcNorm(acName);apt=String(apt||"").toUpperCase();fbo=String(fbo||"").trim().toLowerCase();if(!apt||!fbo)return null;
- var rs=ovData().rows.filter(function(o){return o.airport===apt&&String(o.fbo).trim().toLowerCase()===fbo});var gen=rs.filter(function(o){return !String(o.aircraft||"").trim()}),spec=rs.filter(function(o){return ovAcNorm(o.aircraft)===acName});
- if(!gen.length&&!spec.length)return null;var m={rows:gen.concat(spec)},any=false;OV_F.forEach(function(f){[f==="fuel_price"?gen[0]:null,spec[0]].forEach(function(o){if(o&&o[f]!=null){m[f]=o[f];m[f+"_by"]=o;any=true}})});m.ac=spec.length?ovAcNorm(spec[0].aircraft):"";m.rows=gen.filter(function(o){return o.fuel_price!=null}).concat(spec);if(!any)return null;
- if(!m.rows.length)return null;var last=m.rows.slice().sort(function(a,b){return String(b.updated_at)<String(a.updated_at)?-1:1})[0];m.at=last.updated_at;m.by=last.updated_by;m.note=last.note;return m}
-/* precedence per field: manual on this leg > shared override > vendor / handling-schedule auto > blank */
-function ovApply(l){var src=l.ovSrc||{},man=l.ovMan||{},hok=l.hdl&&l.hdl.st==="ok";delete l.ovr;delete l.ovPrice;l.ovSrc={};
- var fb=ovFboOf(l),o=fb&&!l.ovOff?ovFind(l.from,fb,acNow().name):null;
- if(o&&l.pb&&o.fuel_price!=null&&!man.price){l.ovPrice=o.fuel_price;l.price=o.fuel_price;l.ovSrc.price=1}else if(src.price&&l.pb&&l.pb.t)l.price=+l.pb.t[0][1].toFixed(2);
- if(o&&o.handling_fee!=null&&!man.fee){l.fee=o.handling_fee;l.ovSrc.fee=1}else if(src.fee&&!man.fee&&!hok&&!(l.fhSrc&&l.fhSrc.fee))l.fee="";
- if(o&&o.waiver_gal!=null&&!man.waiver){l.waiver=o.waiver_gal;l.noWaiver=false;l.ovSrc.waiver=1}else if(src.waiver&&!man.waiver&&!hok&&!(l.fhSrc&&l.fhSrc.waiver))l.waiver="";
- if(o&&(l.ovSrc.price||l.ovSrc.fee||l.ovSrc.waiver))l.ovr=o}
 function ovFboOf(l){return l.pb?l.pb.f:l.fhFbo?l.fhFbo:(l.pbPrev&&l.pbPrev.from===l.from?l.pbPrev.f:null)}
 function ovWhoTxt(){var g=ghCfg();return (g.uname?g.uname+(g.login?" ("+g.login+")":""):(g.login||"app user"))}
 function ovStamp(){return new Date(ghNow()).toISOString().replace(/\.\d+Z$/,"Z")}
-function ovMoney(v){return "$"+(+v%1?(+v).toFixed(2):gal(+v))}
-function ovDesc(r){var p=[];if(r.fuel_price!=null)p.push("fuel "+ovMoney(r.fuel_price));if(r.handling_fee!=null)p.push("handling "+ovMoney(r.handling_fee));if(r.waiver_gal!=null)p.push("waiver "+gal(r.waiver_gal)+" gal");return p.join(", ")||"cleared"}
 /* queue a change: {rows:[{key fields + values | del:true}], at, msg?} — applied locally now, written to GitHub by ovFlush */
-function ovMerge(rows,items,who){var by={};rows.forEach(function(o){by[ovKey(o)]=o});items.forEach(function(it){it.rows.forEach(function(r){var k=ovKey(r),cur=by[k];
-  if(r.del){delete by[k];return}var n=cur?Object.assign({},cur):{airport:String(r.airport).toUpperCase(),fbo:r.fbo,aircraft:r.aircraft||"",fuel_price:null,handling_fee:null,waiver_gal:null,note:""};
-  OV_F.concat(["note"]).forEach(function(f){if(r[f]!==undefined)n[f]=r[f]});if(OV_F.every(function(f){return n[f]==null})){delete by[k];return}n.updated_at=it.at;n.updated_by=who||n.updated_by||"";by[k]=n})});
- return Object.keys(by).map(function(k){return by[k]})}
-function ovQueue(rows,msg){var it={rows:rows,at:ovStamp(),msg:msg||null};ovQ().push(it);var d=ovData();d.rows=ovMerge(d.rows,[it],ovWhoTxt());ovFlush(function(){render();save()})}
 function ovB64e(s){return btoa(unescape(encodeURIComponent(s)))}
 function ovB64d(s){return decodeURIComponent(escape(atob(String(s||"").replace(/\s+/g,""))))}
 function ovReq(method,url,body,cb){if(typeof fetch!=="function"||!ghOnline()){cb({off:true});return}
  fetch(url,{method:method,headers:{"Authorization":"Bearer "+ghTok(),"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json"},body:body?JSON.stringify(body):undefined,cache:"no-store"}).then(function(r){
   return r.json().catch(function(){return{}}).then(function(d){cb(r.ok?null:{status:r.status,msg:(d&&d.message)||("GitHub error "+r.status)},d)})}).catch(function(){cb({off:true})})}
 function ovWho(cb){var g=ghCfg();if(g.login){cb();return}ovReq("GET","https://api.github.com/user",null,function(e,d){if(!e&&d&&d.login)g.login=d.login;cb()})}   // login only; the token itself is never written anywhere
-var OV_RO="Your GitHub token can read but not write. To share overrides, edit the token: Repository permissions › Contents › Read and write (repo adibiase/fuel-prices).";
-function ovFlush(cb,tries){var g=ghCfg(),q=ovQ();tries=tries||0;if(!q.length||g.ovBusy||!ghTok()||!ghOnline()){cb&&cb();return}g.ovBusy=true;
- var fin=function(err){g.ovBusy=false;if(err!==undefined)g.ovErr=err;cb&&cb()};
- ovWho(function(){var who=ovWhoTxt();ghFetch("contents/"+OV_PATH,"application/vnd.github+json",function(e,d){
-  if(e&&e.status!==404){fin(e.off?"Offline — "+q.length+" shared override change(s) queued, will retry.":e.msg);return}
-  var base=[],sha=null;if(!e&&d){sha=d.sha;try{base=ovParse(csvParse(ovB64d(d.content)))}catch(x){base=[]}}
-  var items=q.slice(),rows=ovMerge(base,items,who),first=items[0].rows[0]||{},msg=items.length===1&&items[0].msg?items[0].msg+" by "+who:items.length===1?"Override "+first.airport+" "+first.fbo+": "+(first.del?"cleared":ovDesc(first))+" by "+who:"Overrides: "+items.length+" changes by "+who;
-  var body={message:msg,content:ovB64e(ovCsv(rows)),branch:g.branch};if(sha)body.sha=sha;
-  ovReq("PUT",GH_API+g.repo.replace(/^\/+|\/+$/g,"")+"/contents/"+OV_PATH,body,function(e2,r){
-   if(!e2){S.ovQ=ovQ().slice(items.length);var dd=ovData();dd.rows=rows;dd.sha=r&&r.content&&r.content.sha||null;var gv=g.v.overrides=g.v.overrides||{on:true};gv.sha=dd.sha;gv.at=ghNow();gv.name="Shared overrides";g.ovRO=false;g.ovSaved={at:ghNow(),msg:msg};fin(null);return}
-   if((e2.status===409||e2.status===422)&&tries<3){g.ovBusy=false;ovFlush(cb,tries+1);return}       // file changed since we read it → refetch + merge again
-   if(e2.status===403||e2.status===401||(e2.status===404&&sha)){g.ovRO=true;fin(OV_RO);return}
-   if(e2.off){fin("Offline — "+q.length+" shared override change(s) queued, will retry.");return}fin(e2.msg)})})})}
-function ovLoadRows(rows,sha){var d=ovData();d.rows=ovMerge(ovParse(rows),ovQ(),ovWhoTxt());d.sha=sha||null}   // queued local edits stay on top until written
+var OV_RO="Your GitHub token can read but not write. To save FBO Handling entries, edit the token: Repository permissions › Contents › Read and write (repo adibiase/fuel-prices).";
 /* master import: diff against the current file, confirm → one commit */
-function ovDiff(rows){var cur={};ovData().rows.forEach(function(o){cur[ovKey(o)]=o});var D={nw:[],ch:[],same:[],clr:[],rej:[]};
- ovParse([rows[0]].concat(rows.slice(1).filter(function(r){return r&&r.some(function(c){return String(c||"").trim()})}))).forEach(function(o){if(!o.aircraft&&(o.handling_fee!=null||o.waiver_gal!=null)){D.rej.push(o);return}var c=cur[ovKey(o)],blankV=OV_F.every(function(f){return o[f]==null});
-  if(!c){if(!blankV)D.nw.push(o);return}if(blankV){D.clr.push(o);return}
-  var diff=OV_F.some(function(f){return c[f]!==o[f]})||String(c.note||"")!==String(o.note||"");(diff?D.ch:D.same).push(o)});
- // rows with all three values blank but a key in the file = clear that override
- return D}
-function ovImportOk(){var D=PB.ovPending;if(!D)return;var rows=D.nw.concat(D.ch).map(function(o){var r={airport:o.airport,fbo:o.fbo,aircraft:o.aircraft||""};OV_F.forEach(function(f){r[f]=o[f]});r.note=o.note||"";return r}).concat(D.clr.map(function(o){return{airport:o.airport,fbo:o.fbo,aircraft:o.aircraft||"",del:true}}));
- PB.ovPending=null;if(!rows.length)return;ovQueue(rows,"Overrides master import: "+D.nw.length+" new, "+D.ch.length+" changed, "+D.clr.length+" cleared")}
 /* handling fee + waiver are per aircraft: aliases → canonical type; manual leg values are kept per aircraft and swapped on aircraft change */
 function ovAcNorm(s){var t=String(s||"").trim(),x=t.toLowerCase();if(!x)return"";if(/g650|glf6|^sj$|gulfstream/.test(x))return"G650ER";if(/f2th|fa2k|falcon|^hj$|2000\s*lxs|^2000$/.test(x))return"Falcon 2000LXS";return t}
 function acKey(){return ovAcNorm(acNow().name)||acNow().name}
-function acSwitch(l){var k=acKey();if(!l.acCur){l.acCur=k;return}if(l.acCur===k)return;var om=l.ovMan||{},src=l.ovSrc||{},hok=l.hdl&&l.hdl.st==="ok",M=l.acMan=l.acMan||{};
- var mf=om.fee||l.feeManual||(!hok&&!src.fee&&!(l.fhSrc&&l.fhSrc.fee)&&!blank(l.fee)),mw=om.waiver||l.waiverManual||(!hok&&!src.waiver&&!(l.fhSrc&&l.fhSrc.waiver)&&!blank(l.waiver));
- M[l.acCur]={fee:mf?l.fee:null,waiver:mw?l.waiver:null};                    // stash the old aircraft's manual values
- var n=M[k];l.ovMan=Object.assign({},om);delete l.ovMan.fee;delete l.ovMan.waiver;l.feeManual=l.waiverManual=false;
- if(n&&n.fee!=null){l.fee=n.fee;if(hok)l.feeManual=true;else l.ovMan.fee=1}else if(mf||src.fee)l.fee="";
- if(n&&n.waiver!=null){l.waiver=n.waiver;l.noWaiver=false;if(hok)l.waiverManual=true;else l.ovMan.waiver=1}else if(mw||src.waiver){l.waiver="";l.noWaiver=false}
- l.ovSrc={};l.acCur=k}
 /* ---- FBO Handling page: shared per-aircraft handling fee + waiver gal per airport/FBO (private repo fbo-handling/latest.csv) ----
    PRIMARY source: value typed on a leg (written back here) › this table › blank + inline alert (overrides retired; Signature schedule = suggestion only) */
 var FH_COLS=["airport","fbo","aircraft","handling_fee","waiver_gal","effective_date","note","updated_at","updated_by"],FH_PATH="fbo-handling/latest.csv",FH_F=["handling_fee","waiver_gal","effective_date","note"],FH_ACS=["G650ER","Falcon 2000LXS"];
@@ -1119,7 +1057,7 @@ function fhMerge(rows,items,who){var by={};rows.forEach(function(o){by[fhKey(o)]
  return Object.keys(by).map(function(k){return by[k]})}
 function fhLoadRows(rows,sha){var p=fhParse(rows);var d=fhData();d.rows=fhMerge(p.rows,fhQ(),ovWhoTxt());d.sha=sha||null;d.bad=p.bad.length}
 function fhQueue(rows,msg){var it={rows:rows,at:ovStamp(),msg:msg||null};fhQ().push(it);var d=fhData();d.rows=fhMerge(d.rows,[it],ovWhoTxt());fhFlush(function(){render();save()})}
-/* write path = the shared-override path: Contents API with the device PAT, SHA-conflict retry, offline queue, updated_by from GET /user + "Your name" */
+/* write path: Contents API with the device PAT, SHA-conflict retry, offline queue, updated_by from GET /user + "Your name" */
 function fhFlush(cb,tries){var g=ghCfg(),q=fhQ();tries=tries||0;if(!q.length||g.fhBusy||!ghTok()||!ghOnline()){cb&&cb();return}g.fhBusy=true;
  var fin=function(err){g.fhBusy=false;if(err!==undefined)g.fhErr=err;cb&&cb()};
  ovWho(function(){var who=ovWhoTxt();ghFetch("contents/"+FH_PATH,"application/vnd.github+json",function(e,d){
@@ -1130,7 +1068,7 @@ function fhFlush(cb,tries){var g=ghCfg(),q=fhQ();tries=tries||0;if(!q.length||g.
   ovReq("PUT",GH_API+g.repo.replace(/^\/+|\/+$/g,"")+"/contents/"+FH_PATH,body,function(e2,r){
    if(!e2){S.fhQ=fhQ().slice(items.length);var dd=fhData();dd.rows=fhMerge(rows,fhQ(),who);dd.sha=r&&r.content&&r.content.sha||null;var gv=g.v["fbo-handling"]=g.v["fbo-handling"]||{on:true};gv.sha=dd.sha;gv.at=ghNow();gv.name="FBO handling";gv.err=null;g.fhRO=false;g.fhSaved={at:ghNow(),msg:msg};fin(null);return}
    if((e2.status===409||e2.status===422)&&tries<3){g.fhBusy=false;fhFlush(cb,tries+1);return}
-   if(e2.status===403||e2.status===401||(e2.status===404&&sha)){g.fhRO=true;fin(OV_RO.replace("share overrides","save FBO handling entries"));return}
+   if(e2.status===403||e2.status===401||(e2.status===404&&sha)){g.fhRO=true;fin(OV_RO);return}
    if(e2.off){fin("Offline — "+q.length+" FBO handling change(s) queued, will retry.");return}fin(e2.msg)})})})}
 /* resolver */
 function fhFind(apt,fbo,ac){apt=String(apt||"").toUpperCase();fbo=String(fbo||"").trim().toLowerCase();ac=ovAcNorm(ac);if(!apt||!fbo)return null;var td=pbToday();
@@ -1138,12 +1076,12 @@ function fhFind(apt,fbo,ac){apt=String(apt||"").toUpperCase();fbo=String(fbo||""
 function fhFboOf(l){return ovFboOf(l)}
 /* ---- FBO Handling table is PRIMARY for every leg's handling fee + waiver gal (per aircraft).
    Precedence: value typed on the leg (written back to the table) › FBO Handling table › blank + inline alert.
-   Shared overrides (overrides/latest.csv) are no longer read; the Signature schedule is only offered as a suggestion. ---- */
+   Shared overrides are retired (folder ignored, old state purged on load); the Signature schedule is only offered as a suggestion. ---- */
 var FH_DIRZ=["KLBX","KMBS","KBTR"],FH_DEB=null,FH_DEB_MS=1500;
 function fhDirZero(l){return !!(l.pb&&l.pb.dir&&FH_DIRZ.indexOf(String(l.from||"").toUpperCase())>=0)}
 function fhConf(o){return !!o&&/confirmed no fees/i.test(o.note||"")}
 function fhSug(l){if(!l.pb)return null;var c=Object.assign({},l,{ovMan:{},feeManual:false,waiverManual:false,hdl:null});try{hdlSync(c)}catch(e){return null}var h=c.hdl;return h&&h.st==="ok"?{fee:h.fee,w:h.w==null?null:h.w,name:h.name}:null}
-function fhApply(l){delete l.hdl;delete l.ovr;delete l.ovPrice;l.ovSrc={};l.feeManual=l.waiverManual=false;delete l.fhr;
+function fhApply(l){delete l.hdl;delete l.ovr;delete l.ovPrice;delete l.ovSrc;delete l.ovOff;l.feeManual=l.waiverManual=false;delete l.fhr;
  var fb=ovFboOf(l),ac=acKey(),k=String(l.from||"").toUpperCase()+"|"+String(fb||"").toLowerCase()+"|"+ac,prev=l.fhSt,pk=l.fhK;l.fhK=k;
  if(fhDirZero(l)){l.fee=0;l.waiver=0;l.noWaiver=false;l.fhSt="dirzero";return}
  if(!fb){l.fhSt="nofbo";if(pk&&pk!==k&&prev&&prev!=="nofbo"){l.fee="";l.waiver=""}l.noWaiver=false;return}
@@ -1225,33 +1163,13 @@ function fhSubmit(){var v=fhValidate(fhForm());S.fhErr=v.errs;S.fhMsg="";if(!v.r
  fhQueue(rows);S.fhMsg=(ed?"Saved ":"Added ")+v.rows.map(function(r){return r.airport+" "+r.fbo+" ("+r.aircraft+")"}).join(", ");S.fhEdit=null;S.fhForm=null;S.fhErr={};return true}
 function fhLoadRow(r){S.fhEdit={airport:r.airport,fbo:r.fbo,aircraft:r.aircraft,src:r.src};S.fhForm={apt:r.airport,fbo:r.fbo,ac:FH_ACS.indexOf(r.aircraft)>=0?r.aircraft:"",fee:r.fee==null?"":String(r.fee),wv:r.wv==null?"":String(r.wv),fee2:"",wv2:"",note:r.src==="FBO page"?r.note||"":"",eff:r.eff||""};S.fhErr={};S.fhMsg=""}
 function fhDelete(){var ed=S.fhEdit;if(!ed)return;if(ed.src!=="FBO page"){S.fhMsg="Only FBO page entries can be deleted here (this row comes from "+ed.src+").";return}fhQueue([{airport:ed.airport,fbo:ed.fbo,aircraft:ed.aircraft,del:true}]);S.fhMsg="Deleted "+ed.airport+" "+ed.fbo+" ("+ed.aircraft+")";S.fhEdit=null;S.fhForm=null}
-function ovPendHtml(){var D=PB.ovPending;if(!D)return"";var li=function(o){return '<li>'+esc(o.airport+" "+o.fbo+(o.aircraft?" ("+o.aircraft+")":"")+": "+ovDesc(o))+'</li>'};
- return '<div class="pbsum"><b>Overrides master — preview</b><div class="kv"><span>New</span><span>'+D.nw.length+'</span><span>Changed</span><span>'+D.ch.length+'</span><span>Cleared</span><span>'+D.clr.length+'</span><span>Unchanged</span><span>'+D.same.length+'</span>'+(D.rej.length?'<span>Rejected</span><span>'+D.rej.length+'</span>':'')+'</div>'+(D.rej.length?'<div class="card warn">⚠️ Rejected — aircraft required for handling/waiver (use G650ER or Falcon 2000LXS):<ul class="sm">'+D.rej.map(function(o){return '<li>'+esc(o.airport+' '+o.fbo+': '+ovDesc(o))+'</li>'}).join('')+'</ul></div>':'')+
-  (D.nw.length+D.ch.length+D.clr.length?'<ul class="sm">'+D.nw.map(li).join("")+D.ch.map(li).join("")+D.clr.map(li).join("")+'</ul>':'<p class="sm">Nothing to change.</p>')+
-  '<div class="row"><button class="btn pri" id="ovimpok"'+(D.nw.length+D.ch.length+D.clr.length?'':' disabled')+'>Confirm &amp; push to GitHub</button><button class="btn" id="ovimpx">Cancel</button></div><p class="muted">Only new / changed rows get today’s date and your name as “updated by”.</p></div>'}
-function ovSectionHtml(){var g=ghCfg(),q=ovQ(),n=ovData().rows.length,h='<div class="ovs"><p class="sm" style="margin:12px 0 4px"><b>Shared FBO overrides</b> <span class="lsub">'+n+' in overrides/latest.csv (private repo)</span></p>';
- if(q.length)h+='<div class="hint">⏳ '+q.length+' change(s) waiting to be written to GitHub</div>';if(g.ovErr)h+='<div class="card warn">⚠️ '+esc(g.ovErr)+'</div>';else if(g.ovSaved)h+='<div class="ghst">✓ Saved '+ghWhen(g.ovSaved.at)+' — '+esc(g.ovSaved.msg)+'</div>';
- h+='<div class="row"><button class="btn" id="ovimp">⇪ Import overrides master</button><button class="btn" id="ovdl"'+(n?'':' disabled')+'>⇩ Download overrides master</button></div>';
- return h+ovPendHtml()+'</div>'}
-function ovLegHtml(l,i){var h="",o=l.ovr,fb=ovFboOf(l),man=l.ovMan||{},canSave=fb&&(man.price&&!blank(l.price)||man.fee||man.waiver);
- if(o){var p=[];if(l.ovSrc.price)p.push("fuel $"+(+o.fuel_price).toFixed(2));if(l.ovSrc.fee)p.push("handling "+ovMoney(o.handling_fee));if(l.ovSrc.waiver)p.push("waiver "+gal(o.waiver_gal)+" gal");
-  h+='<div class="hint ovl"><span class="tg ov">Shared override ('+esc(l.ovSrc.fee||l.ovSrc.waiver?(o.ac||acKey()):'all aircraft')+')</span> · '+esc(p.join(" · "))+' · updated '+(o.at?pbDTxt(String(o.at).slice(0,10)):"?")+(o.by?' by '+esc(o.by):'')+(o.note?' · '+esc(o.note):'')+' <button class="lk" data-ovreset="'+i+'">↺ use vendor values</button> <button class="lk" data-ovclr="'+i+'">Clear shared override</button></div>'}
- else if(l.ovOff&&l.pb&&ovFind(l.from,l.pb.f,acNow().name))h+='<div class="hint ovl">Shared override ignored on this leg <button class="lk" data-ovuse="'+i+'">use it</button></div>';
- if(canSave){var wh=[];if(man.price&&!blank(l.price))wh.push('fuel price');if(man.fee||man.waiver)wh.push('handling for '+acKey());h+='<div class="hint ovl"><button class="btn sm" data-ovsave="'+i+'">☁ Save '+esc(wh.join(' + '))+' at '+esc(fb)+'</button> <span class="lsub">for everyone</span></div>'}
- return h}
-function ovSaveLeg(i){var l=S.legs[i];if(!l)return;var fb=ovFboOf(l),man=l.ovMan||{};if(!fb)return;var rows=[];
- if(man.price&&!blank(l.price))rows.push({airport:l.from,fbo:fb,aircraft:"",fuel_price:num(l.price)});
- if(man.fee||man.waiver){var r={airport:l.from,fbo:fb,aircraft:acKey()};if(man.fee)r.handling_fee=blank(l.fee)?null:num(l.fee);if(man.waiver)r.waiver_gal=blank(l.waiver)?null:num(l.waiver);rows.push(r)}
- if(!rows.length)return;ovQueue(rows);if(l.pbPrev&&!l.pb&&man.price){/* price was shared: go back to the FBO so the override shows */var e=(PB.idx[l.from]||[]).filter(function(x){return x.o.f===fb})[0];if(e){l.pb=pbSnap(e);delete l.pbPrev}}
- l.ovMan={};l.feeManual=l.waiverManual=false;l.ovOff=false}
-function ovClearLeg(i){var l=S.legs[i],o=l&&l.ovr;if(!o)return;ovQueue(o.rows.map(function(r){return{airport:r.airport,fbo:r.fbo,aircraft:r.aircraft||"",del:true}}))}
 function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from GitHub</b> <span class="lsub">private repo</span>';
  Object.keys(g.v).forEach(function(f){var v=g.v[f];if(v.sha&&v.on)h+='<div class="ghst">✓ Prices from GitHub · '+esc(v.name||f)+' · updated '+ghWhen(v.at)+' · sha '+esc(v.sha.slice(0,7))+(v.checked&&v.checked>v.at?' <span class="lbu">(checked '+ghWhen(v.checked)+')</span>':'')+'</div>'});
  if(g.err)h+='<div class="card warn">⚠️ '+esc(g.err)+'</div>';
  h+=ghAutoHtml();
  h+='<div class="row"><div><label>Repo (owner/name)</label><input id="ghrepo" value="'+esc(g.repo)+'" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div><label>Branch</label><input id="ghbranch" value="'+esc(g.branch)+'" autocapitalize="off" autocorrect="off" spellcheck="false"></div></div>';
  h+='<label>Fine-grained access token <span class="lsub">saved on this device only</span></label><div class="ghtok"><input id="ghtok" type="'+(PB.ghShow?'text':'password')+'" value="'+esc(tok)+'" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="btn" id="ghshow">'+(PB.ghShow?'Hide':'Show')+'</button><button class="btn" id="ghclr">Clear</button></div>';
- h+='<label>Your name <span class="lsub">optional — shown with your GitHub login as “updated by” on FBO Handling entries</span></label><input id="ovname" value="'+esc(g.uname||'')+'" placeholder="e.g. Anthony" autocomplete="name"><div class="hint">'+(g.login?'Signed in to GitHub as <b>'+esc(g.login)+'</b>. ':'')+'Saving FBO Handling entries needs the token’s <b>Contents: Read and write</b> permission on this repo (prices alone need Read-only).'+(g.ovRO?' <span class="tg exp">this token is read-only</span>':'')+'</div>';
+ h+='<label>Your name <span class="lsub">optional — shown with your GitHub login as “updated by” on FBO Handling entries</span></label><input id="ovname" value="'+esc(g.uname||'')+'" placeholder="e.g. Anthony" autocomplete="name"><div class="hint">'+(g.login?'Signed in to GitHub as <b>'+esc(g.login)+'</b>. ':'')+'Saving FBO Handling entries needs the token’s <b>Contents: Read and write</b> permission on this repo (prices alone need Read-only).'+(g.fhRO?' <span class="tg exp">this token is read-only</span>':'')+'</div>';
  if(g.folders&&g.folders.length){h+='<label>Vendor files (folder/latest.csv)</label>';g.folders.forEach(function(f){var v=g.v[f]||{};h+='<div class="tog"><span>'+esc(f)+'/latest.csv'+(v.name?' <span class="lbu">· '+esc(v.name)+'</span>':'')+(v.err?' <span class="tg exp">'+esc(v.err)+'</span>':'')+'</span><label class="sw"><input type="checkbox" data-ghv="'+esc(f)+'"'+(v.on?' checked':'')+'><span></span></label></div>'})}
  h+='<div class="row"><button class="btn pri" id="ghref"'+(g.busy||!tok?' disabled':'')+'>'+(g.busy?'⏳ Checking…':(g.folders?'↻ Refresh now':'Connect & load'))+'</button><button class="btn" id="ghlist"'+(g.busy||!tok?' disabled':'')+'>List vendors</button></div>';
  h+='<p class="muted">'+(ghAutoMin()?'Checks GitHub on open, every '+ghAutoMin()+' min while the app is open, and when you return to it (one small request; files download only when they changed). New prices and handling schedules are imported and the plan is recalculated; values you typed stay.':'Checks GitHub when the app opens (at most every 6 hours) and downloads a file only when it changed.')+' Offline, the prices saved on this device are used.</p>';
