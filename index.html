@@ -415,10 +415,87 @@ function mailtoHref(r){var s=encodeURIComponent(reportSubject()),b="mailto:?subj
 function toast(m){var e=document.querySelector("#toast");if(!e)return;e.textContent=m;e.className="toast on";clearTimeout(toast.t);toast.t=setTimeout(function(){e.className="toast"},2200)}
 function copyText(t){function fb(){try{var ta=document.createElement("textarea");ta.value=t;ta.setAttribute("readonly","");ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();var ok=document.execCommand("copy");document.body.removeChild(ta);toast(ok?"Report copied":"Copy failed — select and copy manually")}catch(e){toast("Copy failed")}}
  if(typeof navigator!=="undefined"&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast("Report copied")},fb);else fb()}
+/* ---- One-page PDF report (hand-rolled PDF 1.4 writer: Helvetica / Helvetica-Bold, WinAnsi, real selectable text, no dependencies) ---- */
+var PDF_W={n:[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584],b:[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584]};
+function pdfWt(b){return PDF_W[b?"b":"n"]}
+function pdfAscii(s){s=String(s==null?"":s).replace(/[→⟶]/g,"->").replace(/[·•]/g,"-").replace(/[—–−]/g,"-").replace(/≥/g,">=").replace(/≤/g,"<=").replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/…/g,"...").replace(/×/g,"x").replace(/[  ]/g," ").replace(/✓/g,"ok").replace(/⚠️?/g,"!");if(s.normalize)s=s.normalize("NFD").replace(/[̀-ͯ]/g,"");return s.replace(/[^ -~]/g,"?")}
+function pdfTw(s,sz,b){var w=pdfWt(b),t=0;s=pdfAscii(s);for(var i=0;i<s.length;i++){var c=s.charCodeAt(i)-32;t+=w[c]!=null?w[c]:556}return t*sz/1000}
+function pdfFit(s,sz,b,max){s=pdfAscii(s);if(pdfTw(s,sz,b)<=max)return s;while(s.length>1&&pdfTw(s+"..",sz,b)>max)s=s.slice(0,-1);return s+".."}
+function pdfWrap(s,sz,b,max){var w=pdfAscii(s).split(" "),L=[],c="";w.forEach(function(x){var t=c?c+" "+x:x;if(pdfTw(t,sz,b)>max&&c){L.push(c);c=x}else c=t});if(c)L.push(c);return L.map(function(l){return pdfFit(l,sz,b,max)})}
+function pdfEsc(s){return pdfAscii(s).replace(/[\\()]/g,function(c){return "\\"+c})}
+function PdfPage(){var o=[],f=function(n){return (Math.round(n*100)/100).toString()};return{ops:o,
+ text:function(x,y,s,sz,b,col,al){s=pdfAscii(s);if(al==="r")x-=pdfTw(s,sz,b);else if(al==="c")x-=pdfTw(s,sz,b)/2;o.push((col||"0 0 0")+" rg BT /"+(b?"F2":"F1")+" "+f(sz)+" Tf "+f(x)+" "+f(y)+" Td ("+pdfEsc(s)+") Tj ET")},
+ rect:function(x,y,w,h,col){o.push(col+" rg "+f(x)+" "+f(y)+" "+f(w)+" "+f(h)+" re f")},
+ line:function(x1,y1,x2,y2,col,lw){o.push(col+" RG "+f(lw||0.5)+" w "+f(x1)+" "+f(y1)+" m "+f(x2)+" "+f(y2)+" l S")}}}
+/* assemble a PDF file (string of bytes, ASCII only) from one page's operators */
+function pdfBuild(pg,meta){var st=pg.ops.join("\n"),ob=[],off=[],out="%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+ ob.push("<< /Type /Catalog /Pages 2 0 R >>");ob.push("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+ ob.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>");
+ ob.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");ob.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+ ob.push("<< /Length "+st.length+" >>\nstream\n"+st+"\nendstream");
+ ob.push("<< /Title ("+pdfEsc(meta.title||"")+") /Producer (Fuel Tankering Optimizer) /CreationDate (D:"+(meta.date||"")+") >>");
+ ob.forEach(function(b,i){off.push(out.length);out+=(i+1)+" 0 obj\n"+b+"\nendobj\n"});var x=out.length;
+ out+="xref\n0 "+(ob.length+1)+"\n0000000000 65535 f \n"+off.map(function(n){return ("000000000"+n).slice(-10)+" 00000 n \n"}).join("")+"trailer\n<< /Size "+(ob.length+1)+" /Root 1 0 R /Info "+ob.length+" 0 R >>\nstartxref\n"+x+"\n%%EOF\n";return out}
+function pdfBytes(s){var a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i)&255;return a}
+function pdfName(t){var d=new Date(t||Date.now());return "Tankering_"+routeStr().replace(/[^A-Z0-9-]/gi,"")+"_"+d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())+".pdf"}
+/* the data that goes on the page (kept separate so tests can check it) */
+function pdfData(r,now){var a=acNow(),P=wvPlans(r),stops=[],warn=[],src={};now=now||Date.now();
+ r.rows.forEach(function(x,i){var l=r.legs[i],sl=S.legs[i]||{},pb=sl.pb,t=l.tiers?l.tiers[Math.max(0,x.ti)]:null,fn=l.fbo&&l.fbo.name||"",pv=pb?pbProvOf(pb):"";
+  if(pb){var dt=pb.r?"received "+pbDTxt(pb.r):pb.d?(pb.dir?"expires ":"dated ")+pbDTxt(pb.d):"";src[pv]=src[pv]||dt;if(pb.gone)warn.push(l.from+": the contract entry ("+pv+" "+fn+") was removed from the latest price file - price kept from the last import");if(pb.note&&/tail/i.test(pb.note))warn.push(l.from+": "+pb.note);if(pb.d&&pb.d<pbToday())warn.push(l.from+": "+pv+" price expired "+pbDTxt(pb.d))}
+  var nw=l.fee>0&&!isFinite(l.payFee?l.w0:l.w);
+  stops.push({apt:l.from||"?",fbo:fn||(pb?"":"manual price"),prov:pv&&fn.toLowerCase().indexOf(pv.toLowerCase())!==0?pv:"",price:x.tp,tier:t&&l.tiers.length>1?pbTierLab(t[0])+" gal tier":"",u:x.u,fuel:x.fuel,fee:x.fee,feeList:l.fee,waived:l.fee>0&&x.fee===0,w:l.payFee?l.w0:l.w,noWaiver:nw,strat:sl.hs==="w"?"Min to waive":sl.hs==="p"?"Pay fee":"Auto",ovr:!!sl.hs,total:x.fuel+x.fee,dec:x.decision,wshort:!!x.wshort});
+  if(x.wshort)warn.push(l.from+": waiver minimum can't be reached ("+x.decision+") - handling fee charged")});
+ r.warn.forEach(function(w){if(!/waiver minimum .* can't be bought/.test(w))warn.push(w)});
+ if(P&&P.mins&&!P.mins.infeasible&&P.mins.wshort)P.mins.wshort.forEach(function(i){warn.push("All-minimums scenario: "+P.mins.legs[i].from+" waiver minimum can't be reached (tank / weight limit)")});
+ var tot=stops.reduce(function(s,x){return s+x.total},0),auto=P?wvTot(P.auto):tot,mins=P&&!P.mins.infeasible?wvTot(P.mins):null;
+ return{title:"Fuel Tankering Plan",route:routeStr().split("-"),ac:a.name,trip:S.trip||"",gen:now,src:Object.keys(src).filter(Boolean).map(function(k){return k+(src[k]?" ("+src[k]+")":"")}),
+  stops:stops,total:tot,baseline:r.baseline,savBase:r.baseline-tot,mins:mins,savMins:mins==null?null:mins-tot,auto:auto,ovr:stops.some(function(s){return s.ovr}),gal:stops.reduce(function(s,x){return s+x.u},0),warn:warn,start:startGal(),arr:r.rows[r.rows.length-1].arr}}
+function pdfReport(r,now){var D=pdfData(r,now),pg=PdfPage(),M=36,W=612-2*M,y=792-M,n=D.stops.length,dk="0.12 0.22 0.39",gr="0.42 0.45 0.5",lg="0.93 0.94 0.96",ok="0.1 0.5 0.25",bad="0.75 0.15 0.12",d=new Date(D.gen);
+ var mo=function(v){return v==null?"n/a":"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})},gl=function(v){return Math.round(v).toLocaleString("en-US")};
+ // header
+ pg.rect(0,792-6,612,6,dk);pg.text(M,y-14,D.title,20,true,dk);pg.text(612-M,y-12,dmy(D.gen)+" "+p2(d.getHours())+":"+p2(d.getMinutes()),9,false,gr,"r");
+ y-=34;pg.text(M,y,D.route.join("  ->  "),13,true);y-=15;pg.text(M,y,D.ac+(D.trip?"  -  "+D.trip:"")+"  -  start fuel "+gl(D.start)+" gal",9.5,false,gr);
+ y-=12;pdfWrap("Prices: "+(D.src.length?D.src.join("; "):"entered manually"),8,false,W).slice(0,2).forEach(function(l){pg.text(M,y,l,8,false,gr);y-=10});
+ // totals boxes
+ y-=6;var bx=[["Total cost",mo(D.total),dk],["Savings vs need-only baseline",mo(D.savBase),D.savBase>=0?ok:bad],["Savings vs all waiver minimums",D.savMins==null?"n/a":mo(D.savMins),D.savMins==null||D.savMins>=0?ok:bad],["Fuel to buy",gl(D.gal)+" gal",dk]],bw=(W-3*8)/4;
+ bx.forEach(function(b,i){var x=M+i*(bw+8);pg.rect(x,y-40,bw,40,lg);pg.text(x+8,y-13,b[0],7.5,false,gr);pg.text(x+8,y-31,b[1],13,true,b[2])});y-=48;
+ pg.text(M,y-2,"Need-only baseline "+mo(D.baseline)+"   -   All waiver minimums "+mo(D.mins)+(D.ovr?"   -   Optimizer (Auto) "+mo(D.auto)+"; current overrides "+(D.total-D.auto>=0?"+":"-")+mo(Math.abs(D.total-D.auto)):""),8,false,gr);y-=16;
+ // table
+ var C=[["Airport",0,"l"],["FBO / provider",48,"l"],["Price / tier",168,"l"],["Gal to buy",262,"r"],["Fuel cost",320,"r"],["Handling fee",328,"l"],["Strategy",420,"l"],["Stop total",W,"r"]],rh=n>4?24:28,fs=n>4?8:8.5;
+ pg.rect(M,y-16,W,16,dk);C.forEach(function(c){pg.text(M+c[1]+(c[2]==="r"?-4:4),y-11,c[0],7.5,true,"1 1 1",c[2])});y-=16;
+ D.stops.forEach(function(s,i){if(i%2)pg.rect(M,y-rh,W,rh,"0.97 0.97 0.98");var y1=y-11,y2=y-21,X=function(k){return M+C[k][1]+4};
+  pg.text(X(0),y1,s.apt,fs+0.5,true);pg.text(X(0),y2,"Leg "+(i+1),7,false,gr);
+  pg.text(X(1),y1,pdfFit(s.fbo||"-",fs,false,112),fs);if(s.prov)pg.text(X(1),y2,pdfFit(s.prov,7,false,112),7,false,gr);
+  pg.text(X(2),y1,"$"+s.price.toFixed(2)+"/gal",fs);if(s.tier)pg.text(X(2),y2,pdfFit(s.tier,7,false,88),7,false,gr);
+  pg.text(M+C[3][1]-4,y1,gl(s.u),fs,true,null,"r");pg.text(M+C[4][1]-4,y1,mo(s.fuel),fs,false,null,"r");
+  pg.text(X(5),y1,s.feeList>0?(s.waived?"Waived":mo(s.fee)+" paid"):"None",fs,s.feeList>0,s.waived?ok:s.feeList>0?bad:gr);
+  if(s.feeList>0)pg.text(X(5),y2,s.noWaiver?"No waiver available":"fee $"+gl(s.feeList)+", waive "+gl(Math.ceil(s.w))+" gal",7,false,gr);
+  pg.text(X(6),y1,s.strat+(s.ovr?" *":""),fs,s.ovr,s.ovr?"0.45 0.28 0.75":null);pg.text(X(6),y2,pdfFit(s.dec,7,false,W-C[6][1]-60),7,false,s.wshort?bad:gr);
+  pg.text(M+W-4,y1,mo(s.total),fs,true,null,"r");y-=rh});
+ pg.line(M,y,M+W,y,dk,1);y-=13;pg.text(M+4,y,"Trip total",9,true);pg.text(M+C[3][1]-4,y,gl(D.gal),9,true,null,"r");pg.text(M+W-4,y,mo(D.total),9,true,dk,"r");
+ if(D.ovr){y-=11;pg.text(M+4,y,"* strategy overridden by the user (not Auto)",7,false,"0.45 0.28 0.75")}y-=18;
+ // compact fuel-to-buy bars (only if room)
+ var foot=M+14,need=14+n*13+10,wl=D.warn.length?18+Math.min(D.warn.length,8)*10:0;
+ if(y-need-wl>foot){pg.text(M,y,"Fuel to buy at each airport",9.5,true,dk);y-=12;var mx=Math.max.apply(null,D.stops.map(function(s){return s.u}).concat([1])),bw2=W-120;
+  D.stops.forEach(function(s){pg.text(M,y-8,s.apt,8,true);if(s.u>0)pg.rect(M+44,y-10,Math.max(1,bw2*s.u/mx),9,s.strat==="Auto"?"0.24 0.47 0.75":"0.45 0.28 0.75");pg.text(M+48+(s.u>0?bw2*s.u/mx:0),y-8,s.u>0?gl(s.u)+" gal":"no buy",8,false,gr);y-=13});y-=10}
+ // warnings (always fit: truncated to the room left)
+ if(D.warn.length){pg.text(M,y,"Warnings and flags",9.5,true,bad);y-=12;var lines=[];D.warn.forEach(function(w){pdfWrap("- "+w,8,false,W).forEach(function(l){lines.push(l)})});
+  var room=Math.max(1,Math.floor((y-foot-4)/10));if(lines.length>room){lines=lines.slice(0,room-1);lines.push("... "+(D.warn.length)+" warnings in total - see the app")}lines.forEach(function(l){pg.text(M,y,l,8);y-=10})}
+ // footer
+ pg.line(M,M+8,M+W,M+8,"0.8 0.8 0.8",0.5);pg.text(M,M-2,"Fuel Tankering Optimizer - planning aid only; verify prices, fees and limits with the FBO before purchase.",7,false,gr);pg.text(M+W,M-2,"Page 1 of 1",7,false,gr,"r");
+ return pdfBuild(pg,{title:D.title+" - "+D.route.join("-"),date:d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+p2(d.getHours())+p2(d.getMinutes())})}
+function pdfBlob(r){return new Blob([pdfBytes(pdfReport(r))],{type:"application/pdf"})}
+function pdfDownload(blob,name){var u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u)},4000)}
+/* share: files via the Web Share API when the browser can share files (iOS Safari, Android); otherwise download the PDF, then the text share / mail fallback */
+function pdfShareMode(nav,file){try{return nav&&typeof nav.share==="function"&&typeof nav.canShare==="function"&&typeof File==="function"&&nav.canShare({files:[file]})?"files":nav&&typeof nav.share==="function"?"text":"mail"}catch(e){return nav&&typeof nav.share==="function"?"text":"mail"}}
+function shareReport(r){var name=pdfName(),blob=pdfBlob(r),file=typeof File==="function"?new File([blob],name,{type:"application/pdf"}):null,nav=typeof navigator!=="undefined"?navigator:null,m=pdfShareMode(nav,file),title=reportSubject(),text=reportText(r);
+ if(m==="files"){nav.share({files:[file],title:title,text:text}).catch(function(e){if(e&&e.name==="AbortError")return;pdfDownload(blob,name);nav.share({title:title,text:text}).catch(function(){})});return m}
+ pdfDownload(blob,name);if(m==="text")nav.share({title:title,text:text}).catch(function(){});else{toast("PDF downloaded — attach "+name+" to the email");setTimeout(function(){window.location.href=mailtoHref(r)},400)}return m}
 function reportBlock(r){var ok=r&&r.n&&!r.infeasible,sh=typeof navigator!=="undefined"&&typeof navigator.share==="function";
  return '<h2>Report</h2><div class="card"><button class="btn full pri" id="email"'+(ok?'':' disabled')+' style="margin-top:0">✉ Email report</button>'+
- '<div class="row" style="margin-top:8px">'+(sh?'<button class="btn" id="share"'+(ok?'':' disabled')+'>Share…</button>':'')+'<button class="btn" id="copyrep"'+(ok?'':' disabled')+(sh?'':' style="grid-column:1/-1"')+'>Copy report</button></div>'+
- '<p class="muted">'+(ok?'Opens your mail app with the plan as the message body; add the recipient.':'Enter a complete trip to create a report.')+'</p></div>'}
+ '<div class="row" style="margin-top:8px"><button class="btn" id="pdfexp"'+(ok?'':' disabled')+'>⬇ Export PDF</button><button class="btn" id="share"'+(ok?'':' disabled')+'>'+(sh?'Share PDF…':'Share (PDF + email)')+'</button></div>'+
+ '<div class="row" style="margin-top:8px"><button class="btn" id="copyrep"'+(ok?'':' disabled')+' style="grid-column:1/-1">Copy report</button></div>'+
+ '<p class="muted">'+(ok?'Email opens your mail app with the plan as the message body. Export PDF saves a one-page US Letter PDF; Share attaches it'+(sh?'':' (this browser downloads it first, then opens your mail app — attach the file)')+'.':'Enter a complete trip to create a report.')+'</p></div>'}
 var MQ=(typeof window!=="undefined"&&window.matchMedia)?window.matchMedia("(min-width: 1024px)"):null;
 function DESK(){var v=S.view||"auto";return v==="desktop"||(v!=="phone"&&!!(MQ&&MQ.matches))}
 if(MQ){var mqf=function(){if((S.view||"auto")==="auto")render()};if(MQ.addEventListener)MQ.addEventListener("change",mqf);else if(MQ.addListener)MQ.addListener(mqf)}
@@ -531,9 +608,10 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
  else if((d=t.getAttribute("data-pbdel"))!=null){if(typeof confirm==="function"&&!confirm("Remove these contract prices from this device?"))return;pbDel(d);if(PB.last&&PB.last.id===d)PB.last=null}
  else if(t.id==="pbsave"){var ne=$("#pbname");if(ne&&PB.pending)PB.pending.name=ne.value;pbSaveMap()}
  else if(t.id==="pbcancel"){PB.pending=null;PB.err=null}
- else if(t.id==="email"||t.id==="share"||t.id==="copyrep"){var rr=compute();if(!rr.n||rr.infeasible)return;
+ else if(t.id==="email"||t.id==="share"||t.id==="copyrep"||t.id==="pdfexp"){var rr=compute();if(!rr.n||rr.infeasible)return;
   if(t.id==="email")window.location.href=mailtoHref(rr);
-  else if(t.id==="share"){navigator.share({title:reportSubject(),text:reportText(rr)}).catch(function(){})}
+  else if(t.id==="share")shareReport(rr);
+  else if(t.id==="pdfexp"){pdfDownload(pdfBlob(rr),pdfName());toast("PDF saved: "+pdfName())}
   else copyText(reportSubject()+"\r\n\r\n"+reportText(rr));return}
  else if(t.id==="add"){var last=S.legs[S.legs.length-1]||{to:""},nl=newLeg();if(blank(nl.from))nl.from=last.to||"";S.legs.push(nl)}
  else if((d=t.getAttribute("data-delac"))!=null){S.aircraft.splice(+d,1);S.ac=0}
