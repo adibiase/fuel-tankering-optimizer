@@ -40,7 +40,7 @@ input,select{width:100%;min-height:44px;font:inherit;font-size:16px;color:var(--
 .ver{font-size:11px;color:var(--t2);text-align:center;margin:18px 0 8px}
 .updbar{display:block;width:100%;border:0;border-radius:10px;background:#1f6feb;color:#fff;font:inherit;font-size:14px;font-weight:600;padding:12px;margin:8px 0;cursor:pointer}
 .nav{margin:4px 0 10px}.nav button{flex:1}.ferr{color:var(--bad);font-size:12px;margin-top:2px}.fht{width:100%;border-collapse:collapse;font-size:13px}.fht th,.fht td{padding:6px 5px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}.fht th button{font-weight:600;white-space:nowrap}.fht tr[data-fhrow]{cursor:pointer}.fht tr.sup{opacity:.6}.fht tr.use td:first-child{box-shadow:inset 3px 0 var(--ok)}.fhw{overflow-x:auto;-webkit-overflow-scrolling:touch}.fhf select{width:100%}@media(max-width:600px){.fht thead{display:none}.fht,.fht tbody,.fht tr,.fht td{display:block;width:100%}.fht tr{border:1px solid var(--bd);border-radius:10px;margin:0 0 8px;padding:6px 8px;background:var(--card)}.fht td{border:0;padding:2px 0}.fht td:nth-child(3)::before{content:"Aircraft: ";color:var(--t2)}.fht td:nth-child(4)::before{content:"Fee: ";color:var(--t2)}.fht td:nth-child(5)::before{content:"Waiver gal: ";color:var(--t2)}.fht td:nth-child(6)::before{content:"Source: ";color:var(--t2)}.fht td:nth-child(7)::before{content:"Updated: ";color:var(--t2)}.fht td:nth-child(8)::before{content:"By: ";color:var(--t2)}.fht td:nth-child(6) br{display:none}.fht tr.use{border-left:4px solid var(--ok)}.fht tr.use td:first-child{box-shadow:none}}
-.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;border:1px solid var(--bd);color:var(--t2)}
+.lbu.cpg{white-space:normal;margin-top:2px}.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;border:1px solid var(--bd);color:var(--t2)}
 .sticky{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--card) 92%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--bd);padding:10px 16px calc(10px + env(safe-area-inset-bottom));z-index:9}
 .sticky .in{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .big{font-size:22px;font-weight:700;color:var(--ok);font-variant-numeric:tabular-nums}.sm{font-size:12px;color:var(--t2)}
@@ -186,7 +186,7 @@ function optimize(inp){
   out.altSavings=alt-best.obj;
   return out;}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.10.29.2013",APP_BUILT="2026-10-29 20:13";
+var APP_VERSION="2026.10.29.2032",APP_BUILT="2026-10-29 20:32";
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -317,6 +317,8 @@ function hsHtml(l,i){if(!(num(l.fee)>0)&&!l.hs)return"";var cur=l.hs||"auto",nw=
 function hsResetCard(){var n=S.legs.filter(function(l){return l.hs}).length;return n?'<div class="card hsc">'+hsBadge()+' '+n+' stop'+(n>1?'s':'')+' not on Auto — the plan, charts and totals follow your choices. <button class="btn" id="hsreset">Reset all to Auto</button></div>':""}
 function wvPlans(r){if(!r||!r.n||r.infeasible)return null;var any=S.legs.some(function(l){return l.hs});
  var auto=any?compute({strat:[]}):r,mins=compute({strat:S.legs.map(function(){return "w"})});return{auto:auto,mins:mins,cur:any?r:null,any:any}}
+function cpgAvg(rows){var g=0,f=0,t=0;rows.forEach(function(x){g+=x.u;f+=x.fuel;t+=x.fuel+x.fee});return g>0?{all:t/g,fuel:f/g}:null}
+function cpgTxt(rows){var a=cpgAvg(rows);return a?'Avg $'+a.all.toFixed(2)+'/gal all-in · $'+a.fuel.toFixed(2)+'/gal fuel only':'Avg —'}
 function wvTot(p){return p.rows.reduce(function(s,x){return s+x.fuel+x.fee},0)}
 function wvHtml(r){var P=wvPlans(r);if(!P)return"";var withFee=r.legs.some(function(l){return l.fee>0});if(!withFee)return"";
  var pl=[["Optimizer (Auto)",P.auto]];if(P.cur)pl.push(["Current overrides",P.cur]);pl.push(["All waiver minimums",P.mins]);
@@ -326,7 +328,7 @@ function wvHtml(r){var P=wvPlans(r);if(!P)return"";var withFee=r.legs.some(funct
   h+='<div class="wvs"><div class="hd"><b>'+esc(l.from||"?")+'</b><span class="badge">'+(l.fee>0?'fee '+money(l.fee)+' · '+(nw?'No waiver available':'waive '+gal(Math.ceil(ml.w))+' gal'):'no handling fee')+'</span></div><table><thead><tr><th>Plan</th><th>Gal</th><th>Fuel</th><th>Fee</th><th>Stop</th></tr></thead><tbody>'+
    pl.map(function(p){var x=p[1].rows[i],L=p[1].legs[i];if(!x)return"";return '<tr><td>'+esc(p[0])+(x.wshort?' <span class="tg exp">min not reachable</span>':'')+'</td><td>'+gal(x.u)+'</td><td>'+usd(x.fuel)+'</td><td>'+(l.fee>0?(x.fee>0?usd(x.fee):'<span style="color:var(--ok)">waived</span>'):'—')+'</td><td><b>'+usd(x.fuel+x.fee)+'</b></td></tr>'}).join("")+'</tbody></table></div>'});
  var ta=wvTot(P.auto),tm=wvTot(P.mins),d=tm-ta;
- h+='<div class="sumgrid">'+pl.map(function(p){return '<div><span class="sm">'+esc(p[0])+'</span><b>'+money(wvTot(p[1]))+'</b><span class="lbu">'+gal(p[1].rows.reduce(function(s,x){return s+x.u},0))+' gal</span></div>'}).join("")+'</div>';
+ h+='<div class="sumgrid">'+pl.map(function(p){return '<div><span class="sm">'+esc(p[0])+'</span><b>'+money(wvTot(p[1]))+'</b><span class="lbu">'+gal(p[1].rows.reduce(function(s,x){return s+x.u},0))+' gal</span><span class="lbu cpg">'+cpgTxt(p[1].rows)+'</span></div>'}).join("")+'</div>';
  h+='<p class="wvd" style="color:'+(d>=0?'var(--ok)':'var(--bad)')+'"><b>'+(Math.abs(d)<0.005?'Optimizer and all-minimums cost the same.':d>0?'Optimizer saves '+money(d)+' vs buying the waiver minimum everywhere.':'Buying the waiver minimum everywhere is '+money(-d)+' cheaper than the optimizer plan.')+'</b>'+(P.cur?'<br><span class="sm">Current overrides: '+(function(c){var e=c-ta;return (e>=0?money(e)+' more':money(-e)+' less')+' than the optimizer · '+(tm-c>=0?money(tm-c)+' less':money(c-tm)+' more')+' than all-minimums'})(wvTot(P.cur))+'</span>':'')+'</p>';
  if(P.mins.wshort&&P.mins.wshort.length)h+='<div class="hint">⚠ Waiver minimum can\'t be reached at '+P.mins.wshort.map(function(i){return esc(P.mins.legs[i].from)}).join(", ")+' (tank / weight limit) — fee charged in that plan.</div>';
  return h+'</div>'}
@@ -475,7 +477,7 @@ function pdfReport(r,now){var D=pdfData(r,now),pg=PdfPage(),M=36,W=612-2*M,y=792
  // totals boxes
  y-=6;var bx=[["Total cost",mo(D.total),dk],["Savings vs need-only baseline",mo(D.savBase),D.savBase>=0?ok:bad],["Savings vs all waiver minimums",D.savMins==null?"n/a":mo(D.savMins),D.savMins==null||D.savMins>=0?ok:bad],["Fuel to buy",gl(D.gal)+" gal",dk]],bw=(W-3*8)/4;
  bx.forEach(function(b,i){var x=M+i*(bw+8);pg.rect(x,y-40,bw,40,lg);pg.text(x+8,y-13,b[0],7.5,false,gr);pg.text(x+8,y-31,b[1],13,true,b[2])});y-=48;
- pg.text(M,y-2,"Need-only baseline "+mo(D.baseline)+"   -   All waiver minimums "+mo(D.mins)+(D.ovr?"   -   Optimizer (Auto) "+mo(D.auto)+"; current overrides "+(D.total-D.auto>=0?"+":"-")+mo(Math.abs(D.total-D.auto)):""),8,false,gr);y-=16;
+ pg.text(M,y-2,"Need-only baseline "+mo(D.baseline)+"   -   All waiver minimums "+mo(D.mins)+(D.ovr?"   -   Optimizer (Auto) "+mo(D.auto)+"; current overrides "+(D.total-D.auto>=0?"+":"-")+mo(Math.abs(D.total-D.auto)):""),8,false,gr);y-=11;pg.text(M,y-2,cpgTxt(r.rows).replace("·","-").replace("Avg —","Avg cost per gallon: n/a (no fuel bought)").replace(/^Avg /,"Avg cost per gallon: "),8,false,gr);y-=16;
  // table: every cell wraps (nothing truncated); font shrinks 8.5 -> 6.5 pt to fit; the chart is dropped before anything else
  var C=[["Airport",0,42,"l"],["FBO / provider",42,96,"l"],["Price / tier",138,56,"l"],["Gal to buy",194,48,"r"],["Fuel cost",242,56,"r"],["Handling fee",298,92,"l"],["Strategy / decision",390,90,"l"],["Stop total",480,60,"r"]],pur="0.45 0.28 0.75";
  var cells=function(s,i,fs){var sm=Math.max(6.5,fs-1.5),c=[[[s.apt,fs+0.5,true],["Leg "+(i+1),sm,false,gr]],[[s.fbo||"-",fs,false]].concat(s.prov?[[s.prov,sm,false,gr]]:[]),
