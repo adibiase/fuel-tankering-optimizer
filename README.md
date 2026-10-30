@@ -12,3 +12,9 @@ On iPhone: open the link in Safari, then Share > Add to Home Screen.
 - Trip data is saved only in your browser (localStorage), never uploaded.
 
 Estimates are for planning only and do not replace your flight-planning service.
+
+## Version
+
+The app shows its build version at the bottom of the page ("Version YYYY.MM.DD.HHMM · built … CT") and in the PDF footer ("App v…").
+Each build is stamped automatically by the build script (US Central time of the build). When a newer build is published here,
+the open app shows "New version … available — tap to reload" (checked at most every 10 minutes, silently skipped offline).

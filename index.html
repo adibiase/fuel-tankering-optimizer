@@ -37,6 +37,8 @@ input,select{width:100%;min-height:44px;font:inherit;font-size:16px;color:var(--
 .hsc{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.hsc .btn{margin:0}
 .wv .wvs{border-top:1px solid var(--bd);margin-top:8px;padding-top:6px}.wv table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}.wv th:first-child{width:34%}.wv th{font-size:11px;color:var(--t2);text-align:right;font-weight:600}.wv td{padding:4px 3px;text-align:right;border-bottom:1px solid var(--bd)}.wv th:first-child,.wv td:first-child{text-align:left}
 .wv .sumgrid .lbu{display:block}.wvd{margin:10px 0 2px}
+.ver{font-size:11px;color:var(--t2);text-align:center;margin:18px 0 8px}
+.updbar{display:block;width:100%;border:0;border-radius:10px;background:#1f6feb;color:#fff;font:inherit;font-size:14px;font-weight:600;padding:12px;margin:8px 0;cursor:pointer}
 .badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;border:1px solid var(--bd);color:var(--t2)}
 .sticky{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--card) 92%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--bd);padding:10px 16px calc(10px + env(safe-area-inset-bottom));z-index:9}
 .sticky .in{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
@@ -182,6 +184,8 @@ function optimize(inp){
   out.opt=best.cost;out.obj=best.obj;out.rows=best.rows;out.savings=base-best.obj;out.savPct=base?out.savings/base:0;
   out.altSavings=alt-best.obj;
   return out;}
+/* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
+var APP_VERSION="2026.10.29.1959",APP_BUILT="2026-10-29 19:59";
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -291,6 +295,17 @@ function buildInp(mod){mod=mod||{};var a=S.aircraft[S.ac]||S.aircraft[0],rm=mod.
  return{aircraft:{rate:num(a.rate)*rm,cap:num(a.cap),res:num(a.resLb)/dens(),burn:num(a.burn),bow:num(a.bow),ramp:num(a.ramp),mtow:num(a.mtow),mlw:num(a.mlw),payload:num(a.payload),taxi:num(a.taxi),dens:dens()},
  fbos:S.legs.map(function(l,i){var f=legFbo(l);if(mod.pm){var m=mod.pm(i);f.price*=m;if(f.tiers)f.tiers.forEach(function(t){t[1]*=m})}if(mod.add&&mod.add.i===i){f.price+=mod.add.d;if(f.tiers)f.tiers.forEach(function(t){t[1]+=mod.add.d})}return f}),
  legs:S.legs.map(function(l,i){return{from:l.from,to:l.to,hours:num(l.hours),trip:l.trip===""?null:num(l.trip),reserve:resLb(l)/dens(),payload:blank(l.payload)?null:num(l.payload),fbo:i}}),start:startGal(),chargeZero:S.chargeZero,credit:0,force:mod.force,strat:mod.strat||S.legs.map(function(l){return l.hs||null})}}
+/* ---- app version + "new version available" check (same-origin no-cache fetch of this page; never blocks, silent offline) ---- */
+function verHtml(){return '<p class="ver">Version '+esc(APP_VERSION)+(APP_BUILT?' · built '+esc(APP_BUILT)+' CT':'')+'</p>'}
+var UPD={at:0,newer:null,busy:false},UPD_EVERY=10*60e3,UPD_TIMEOUT=8000;
+function updCmp(a,b){return String(a||"").localeCompare(String(b||""),"en",{numeric:true})}
+function updCheck(cb,force){cb=cb||function(){};var now=Date.now();if(UPD.busy||(!force&&UPD.at&&now-UPD.at<UPD_EVERY)){cb(null);return}
+ var loc=typeof location!=="undefined"?location:(typeof window!=="undefined"&&window.location);if(typeof fetch!=="function"||!loc||!/^https?:/.test(loc.protocol||"")){cb(null);return}
+ if(typeof navigator!=="undefined"&&navigator&&navigator.onLine===false){cb(null);return}
+ UPD.at=now;UPD.busy=true;var done=false,ac=typeof AbortController==="function"?new AbortController():null,fin=function(v){if(done)return;done=true;clearTimeout(t);UPD.busy=false;
+  if(v&&updCmp(v,APP_VERSION)>0&&v!==UPD.newer){UPD.newer=v;try{render()}catch(x){}}cb(v||null)},t=setTimeout(function(){if(ac)try{ac.abort()}catch(x){}fin(null)},UPD_TIMEOUT);if(t&&t.unref)t.unref();
+ try{fetch(String(loc.href).split("#")[0].split("?")[0]+"?v="+now,ac?{cache:"no-store",signal:ac.signal}:{cache:"no-store"}).then(function(r){return r&&r.ok?r.text():""}).then(function(s){var m=String(s||"").match(/APP_VERSION="([0-9.\-a-z]+)"/i);fin(m?m[1]:null)},function(){fin(null)})}catch(x){fin(null)}}
+function updHtml(){return UPD.newer?'<button class="updbar" id="updrel">New version '+esc(UPD.newer)+' available — tap to reload</button>':""}
 function compute(mod){return optimize(buildInp(mod))}
 /* ---- handling strategy per stop (override the optimizer) + waiver-minimum scenario ---- */
 var HS_OPTS=[["auto","Auto (optimize)"],["w","Buy min to waive"],["p","Pay handling fee"]];
@@ -483,7 +498,7 @@ function pdfReport(r,now){var D=pdfData(r,now),pg=PdfPage(),M=36,W=612-2*M,y=792
  if(D.warn.length){pg.text(M,y,"Warnings and flags",9.5,true,bad);y-=12;var lines=[];D.warn.forEach(function(w){pdfWrap("- "+w,8,false,W).forEach(function(l){lines.push(l)})});
   var room=Math.max(1,Math.floor((y-foot-4)/10));if(lines.length>room){lines=lines.slice(0,room-1);lines.push("... "+(D.warn.length)+" warnings in total - see the app")}lines.forEach(function(l){pg.text(M,y,l,8);y-=10})}
  // footer
- pg.line(M,M+8,M+W,M+8,"0.8 0.8 0.8",0.5);pg.text(M,M-2,"Fuel Tankering Optimizer - planning aid only; verify prices, fees and limits with the FBO before purchase.",7,false,gr);pg.text(M+W,M-2,"Page 1 of 1",7,false,gr,"r");
+ pg.line(M,M+8,M+W,M+8,"0.8 0.8 0.8",0.5);pg.text(M,M-2,"Fuel Tankering Optimizer - planning aid only; verify prices, fees and limits with the FBO before purchase.",7,false,gr);pg.text(M+W,M-2,"App v"+APP_VERSION+"   -   Page 1 of 1",7,false,gr,"r");
  return pdfBuild(pg,{title:D.title+" - "+D.route.join("-"),date:d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+p2(d.getHours())+p2(d.getMinutes())})}
 function pdfBlob(r){return new Blob([pdfBytes(pdfReport(r))],{type:"application/pdf"})}
 function pdfDownload(blob,name){var u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u)},4000)}
@@ -542,11 +557,12 @@ function render(){S.legs.forEach(function(l,i){l._i=i;syncHours(l);syncTrip(l);p
  h+='<button class="btn full" id="addac">+ Add aircraft</button></details>';
  }
  h+='<button class="btn full del" id="reset">Clear trip</button><p class="muted">Model mirrors Fuel_Tankering_Optimizer.xlsx: backward pass with burn penalty, per-stop candidates (need / waiver min / tanker thru legs ahead, capped at max fuel) with waiver-credit rule, exhaustive search. Per-leg fuel price, handling fee and waiver gallons are entered on each leg card. Planning tool – verify against flight-plan fuel. Data saved on this device only.</p>';
+ h+=verHtml();
  var hS=h,dk=DESK();h=dk?'<div class="dk"><div class="lcol">'+hA+hS+'</div><div class="rcol">'+hR+'</div></div>':hA+hR+hS;
  if(typeof document!=="undefined"&&document.body&&document.body.classList)document.body.classList.toggle("desk",dk);
  var ae=typeof document!=="undefined"&&document.activeElement,fp=ae&&ae.getAttribute&&ae.getAttribute("data-p"),ss=null;try{ss=fp?[ae.selectionStart,ae.selectionEnd]:null}catch(x){}
  var rc=$(".rcol"),ry=rc?rc.scrollTop:0;
- h+=ghToastHtml();var y=window.scrollY;$("#app").innerHTML=h;window.scrollTo(0,y);rc=$(".rcol");if(rc&&ry)rc.scrollTop=ry;
+ h=updHtml()+h+ghToastHtml();var y=window.scrollY;$("#app").innerHTML=h;window.scrollTo(0,y);rc=$(".rcol");if(rc&&ry)rc.scrollTop=ry;
  if(fp){var ne=$('[data-p="'+fp+'"]');if(ne&&ne.focus){ne.focus();try{if(ss&&ss[0]!=null)ne.setSelectionRange(ss[0],ss[1])}catch(x){}}}
  bar(r)}
 function bar(r){$("#bar").innerHTML=!r.n?'<span class="sm">Enter a leg to see savings</span>':r.infeasible?'<b style="color:var(--bad)">INFEASIBLE</b><span class="sm">'+esc(r.reason)+'</span>':'<div><div class="sm">Savings vs baseline</div><div class="big">'+money(r.savings)+' <span style="font-size:14px">('+(r.savPct*100).toFixed(1)+'%)</span></div></div><div style="text-align:right"><div class="sm">Optimized '+money(r.opt)+'</div><div class="sm">Baseline '+money(r.baseline)+'</div></div>'}
@@ -614,6 +630,7 @@ document.addEventListener("click",function(e){var t=e.target.closest("button");i
   else if(t.id==="share")shareReport(rr);
   else if(t.id==="pdfexp"){pdfDownload(pdfBlob(rr),pdfName());toast("PDF saved: "+pdfName())}
   else copyText(reportSubject()+"\r\n\r\n"+reportText(rr));return}
+ else if(t.id==="updrel"){try{location.reload()}catch(x){}return}
  else if(t.id==="add"){var last=S.legs[S.legs.length-1]||{to:""},nl=newLeg();if(blank(nl.from))nl.from=last.to||"";S.legs.push(nl)}
  else if((d=t.getAttribute("data-delac"))!=null){S.aircraft.splice(+d,1);S.ac=0}
  else if(t.id==="addac")S.aircraft.push({name:"New aircraft",rate:0.03,cap:3000,resLb:5000,burn:300,tas:450,plev:250,allow:0.3,route:5,payload:0});
@@ -974,7 +991,7 @@ function ghAutoHtml(){var g=ghCfg(),m=ghAutoMin(),lu=null;Object.keys(g.v).forEa
  return h+'<div class="row"><button class="btn" id="ghnow"'+(g.busy||!ghTok()?' disabled':'')+'>'+(g.busy?'⏳ Checking…':'Check now')+'</button></div>'}
 function ghStart(){var tick=function(){ghTick(function(ch){if(ch){render();save()}else{var e=typeof document!=="undefined"&&document.querySelector&&document.querySelector("#ghauto-st");if(e&&ghCfg().lastPoll)save()}})};
  if(typeof setInterval==="function"){var iv=setInterval(tick,60e3);if(iv&&iv.unref)iv.unref()}
- if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!ghHidden())tick()});
+ if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!ghHidden()){tick();updCheck()}});
  if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("focus",tick);
  if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("online",tick)}
 /* ---- Shared FBO overrides (private repo overrides/latest.csv): fuel price / handling fee / waiver gal per airport + FBO (+ aircraft) ---- */
@@ -1086,5 +1103,6 @@ function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from Git
  h+='<details class="ghhelp"><summary class="sm">How to create a token</summary><ol class="sm"><li>GitHub › Settings › Developer settings › Fine-grained tokens › <b>Generate new token</b> (<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">open</a>).</li><li>Repository access: <b>Only select repositories</b> → <code>adibiase/fuel-prices</code>.</li><li>Permissions: <b>Contents → Read-only</b> (nothing else).</li><li>Set an expiration (e.g. 90 days), generate, copy the token and paste it above.</li></ol><p class="sm">The token stays in this browser’s storage on this device; it is never put in reports or sent anywhere except api.github.com.</p></details>';
  return h+'</div>'}
 render();pbLoad(function(){if(PB.vendors.length){render();save()}if(ghAutoMin())ghTick(function(ch){if(ch)render();save()});else ghAuto()});ghStart();
+if(typeof setTimeout==="function"){var ut=setTimeout(function(){updCheck()},1500);if(ut&&ut.unref)ut.unref()}
 (function(){var f=S.fcst||{},on=typeof navigator==="undefined"||navigator.onLine!==false;if(typeof fetch==="function"&&on&&S.legs.some(function(l){return legRoute(l)})&&(!f.at||Date.now()-f.at>3600e3))fetchWinds(function(){render();save()})})();
 </script></body></html>
