@@ -201,11 +201,12 @@ function optimize(inp){
   out.altSavings=alt-best.obj;
   return out;}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.02.1609",APP_BUILT="2026-11-02 16:09";
-var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
-aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
+var APP_VERSION="2026.11.02.1647",APP_BUILT="2026-11-02 16:47";
+var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
+aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
-var RES_LB=5000;function newLeg(){return{from:"",to:"",hours:"",hoursManual:false,wind:"",windManual:false,trip:"",tripManual:false,reserveLb:5000,price:"",fee:"",waiver:"",payload:""}}
+var RES_LB=5000;function resDef(){var a=S&&S.aircraft&&(S.aircraft[S.ac]||S.aircraft[0]);var v=a?num(a.resLb):NaN;return v>0?v:RES_LB}   // leg reserve blank = aircraft profile default
+function newLeg(){return{from:"",to:"",hours:"",hoursManual:false,wind:"",windManual:false,trip:"",tripManual:false,reserveLb:"",price:"",fee:"",waiver:"",payload:""}}
 function num(v){var x=parseFloat(v);return isNaN(x)?0:x}
 function blank(v){return v==null||String(v).trim()===""}
 function dens(){return num(S.density)||6.7}
@@ -218,7 +219,10 @@ if(S.density==null)S.density=6.7;if(S.startLb==null){S.startLb=Math.round(num(S.
 if(S.fbos){S.legs.forEach(function(l){var f=S.fbos[l.fbo]||{};if(blank(l.price))l.price=f.price==null?"":f.price;if(blank(l.fee))l.fee=f.fee==null?"":f.fee;if(blank(l.waiver))l.waiver=f.waiver==null?"":f.waiver})}
 delete S.fbos;delete S.fboOpen;S.legs.forEach(function(l){delete l.fbo});
 S.aircraft.forEach(function(a){if(a.resLb==null){a.resLb=Math.round(num(a.res)*S.density);delete a.res}});S.legs.forEach(function(l){if(l.reserveLb==null){l.reserveLb=blank(l.reserve)?"":Math.round(num(l.reserve)*S.density);delete l.reserve}});
-S.legs.forEach(function(l){if(l.hs!=="w"&&l.hs!=="p")delete l.hs});   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
+S.legs.forEach(function(l){if(l.hs!=="w"&&l.hs!=="p")delete l.hs});
+/* one-time 2026-11-02: default reserves G650ER 5,000 lb / Falcon 2000LXS 3,000 lb (old default 5,000 lb for both). Only values still at the old default change;
+   leg reserves equal to the old auto-filled 5,000 lb become blank (= the aircraft's default) */
+if(!S.resMig){S.aircraft.forEach(function(a){var n=String(a.name||"");if(num(a.resLb)===5000&&/falcon\s*2000\s*lxs/i.test(n))a.resLb=3000});S.legs.forEach(function(l){if(!blank(l.reserveLb)&&num(l.reserveLb)===5000)l.reserveLb=""});S.resMig=1}   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
 function acNow(){return S.aircraft[S.ac]||S.aircraft[0]}
 var APT=null;function aptIdx(){if(APT)return APT;APT={};if(typeof APT_DATA==="string")APT_DATA.split("|").forEach(function(r){var f=r.split(",");APT[f[0]]=[+f[1],+f[2],f[3]]});return APT}
 var IATA=null;function iataIdx(){if(IATA)return IATA;IATA={};if(typeof IATA_DATA==="string")for(var k=0;k+7<=IATA_DATA.length;k+=7)IATA[IATA_DATA.substr(k,3)]=IATA_DATA.substr(k+3,4);return IATA}
@@ -292,9 +296,9 @@ function windHint(l){if(l.windManual&&!blank(l.wind))return'<span class="tg man"
  return'<span class="tg">fcst</span> '+(w.kt>=0?'+'+w.kt+' kt tail':'−'+Math.abs(w.kt)+' kt head')+' · '+(PLEV[w.pl]||w.pl+"hPa")+(w.t?' · '+fmtZ(w.t):'')}
 function calcTrip(l){var h=num(l.hours);return h>0?Math.round(h*num(acNow().burn)):""}
 function syncTrip(l){if(l.tripManual&&!blank(l.trip))return;l.tripManual=false;l.trip=calcTrip(l)}
-function resLb(l){return blank(l.reserveLb)?RES_LB:num(l.reserveLb)}
+function resLb(l){return blank(l.reserveLb)?resDef():num(l.reserveLb)}
 function tripHint(l){return (l.tripManual?'<span class="tg man">manual</span> <button class="lk" data-rt="'+l._i+'">↺ reset to calc</button>':'<span class="tg">calc</span> '+(blank(l.trip)?'hrs × '+gal(acNow().burn)+' gal/hr':'≈ '+gal(num(l.trip)*dens())+' lb'))}
-function resHint(l){return '≈ '+gal(resLb(l)/dens())+' gal · '+(resLb(l)<RES_LB?'<span style="color:var(--warn)">below 5,000 lb minimum</span>':'default 5,000 lb')}
+function resHint(l){var d=resDef();return '≈ '+gal(resLb(l)/dens())+' gal · '+(blank(l.reserveLb)?'aircraft default '+gal(d)+' lb':resLb(l)<d?'<span style="color:var(--warn)">below the aircraft default '+gal(d)+' lb</span>':'typed (aircraft default '+gal(d)+' lb)')}
 function wvHint(l){return blank(l.waiver)?'':'≈ '+gal(num(l.waiver)*dens())+' lb'}
 S.credit=0;S.aircraft.forEach(function(a){var d=WDEF[a.name];if(d&&a.mtow==null)for(var k in d)a[k]=d[k];if(d&&((a.name==='Gulfstream G650ER'&&+a.payload===1600)||(a.name==='Dassault Falcon 2000LXS'&&+a.payload===1200)))a.payload=0});if(!S.view)S.view="auto";if(S.setOpen==null)S.setOpen=false;S.legs.forEach(function(l){delete l.dep;l.from=icaoNorm(l.from);l.to=icaoNorm(l.to);["from","to"].forEach(function(f){if(l[f+"T"]!=null)l[f+"T"]=icaoNorm(l[f+"T"]);var t=l[f+"T"]||l[f];if(t)l[f]=aptIcao(t)});if(l.hoursManual==null)l.hoursManual=!blank(l.hours);if(l.tripManual==null)l.tripManual=!blank(l.trip)});
 ovPurge();fhHeal();   // drop overrides-era saved state (status, errors, toggles, cached rows)
@@ -558,7 +562,7 @@ function render(){if(authNeeded()){signinRender();return}if(typeof document!=="u
  h+='<h2>Trip legs</h2><p class="muted">Hours and trip fuel fill in from the airports — type to override. <button class="lk" data-page="help">How it works</button></p>';
  S.legs.forEach(function(l,i){h+='<div class="card"><div class="hd"><b>Leg '+(i+1)+(l.hs?' '+hsBadge():'')+'</b>'+(S.legs.length>1?'<button class="btn del" data-del="'+i+'" aria-label="Remove leg">Remove</button>':'')+'</div>';
   h+='<div class="row3"><div><label class="nw">From <span class="lsub">ICAO or IATA</span></label>'+icaoInp("legs."+i+".from",l.fromT||l.from)+'<div class="hint" id="fh'+i+'">'+aptHint(l.fromT||l.from)+'</div></div><div><label class="nw">To <span class="lsub">ICAO or IATA</span></label>'+icaoInp("legs."+i+".to",l.toT||l.to)+'<div class="hint" id="toh'+i+'">'+aptHint(l.toT||l.to)+'</div></div><div><label>Wind % (+tail)</label>'+inp("legs."+i+".wind",l.wind,"decimal","0")+'<div class="hint" id="wh'+i+'">'+windHint(l)+'</div></div></div>';
-  h+='<div class="row3"><div><label>Flight hrs</label>'+inp("legs."+i+".hours",l.hours,"decimal")+'<div class="hint" id="hh'+i+'">'+hoursHint(l)+'</div></div><div><label>Trip fuel (gal)</label>'+inp("legs."+i+".trip",l.trip,"decimal")+'<div class="hint" id="th'+i+'">'+tripHint(l)+'</div></div><div><label>Reserve (lb)</label>'+inp("legs."+i+".reserveLb",l.reserveLb,"decimal","5000")+'<div class="hint" id="rh'+i+'">'+resHint(l)+'</div></div></div>';
+  h+='<div class="row3"><div><label>Flight hrs</label>'+inp("legs."+i+".hours",l.hours,"decimal")+'<div class="hint" id="hh'+i+'">'+hoursHint(l)+'</div></div><div><label>Trip fuel (gal)</label>'+inp("legs."+i+".trip",l.trip,"decimal")+'<div class="hint" id="th'+i+'">'+tripHint(l)+'</div></div><div><label>Reserve (lb)</label>'+inp("legs."+i+".reserveLb",l.reserveLb,"decimal",String(resDef()))+'<div class="hint" id="rh'+i+'">'+resHint(l)+'</div></div></div>';
   h+='<div class="row3"><div><label>Fuel price $/gal</label>'+inp("legs."+i+".price",l.pb&&isFinite(parseFloat(l.price))?(+l.price).toFixed(2):l.price,"decimal")+'</div><div><label>Handling fee $</label>'+inp("legs."+i+".fee",l.fee,"decimal")+'</div><div><label>Waiver gal</label>'+inp("legs."+i+".waiver",l.waiver,"decimal")+'<div class="hint" id="wvh'+i+'">'+wvHint(l)+'</div></div></div>'+hsHtml(l,i)+pbLegHtml(l,i)+fhLegHtml(l,i)+(wOn()?'<div class="row"><div><label>Payload (lb)</label>'+inp("legs."+i+".payload",l.payload,"decimal",gal(acNow().payload))+'<div class="hint">'+(blank(l.payload)?'blank = default '+gal(acNow().payload)+' lb':'≈ '+gal(plLb(l))+' lb pax + bags + cargo')+'</div></div><div class="hint" style="align-self:center">Zero-fuel wt '+gal(num(acNow().bow)+plLb(l))+' lb</div></div>':'')+'</div>'});
  if(S.legs.length<6)h+='<button class="btn full" id="add">+ Add leg</button>';
  h+='<p class="muted wline">☁ <span id="wst">'+fcstShort()+'</span> <button class="lk" id="fcst">↻ Refresh winds</button></p>';
