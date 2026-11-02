@@ -188,7 +188,7 @@ function optimize(inp){
   out.altSavings=alt-best.obj;
   return out;}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.02.1041",APP_BUILT="2026-11-02 10:41";
+var APP_VERSION="2026.11.02.1051",APP_BUILT="2026-11-02 10:51";
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -1032,8 +1032,32 @@ function helpHtml(){var a=acNow();return '<div class="help"><h1>How it works</h1
  '<h2>Optimizer</h2><div class="card"><p>The model mirrors Fuel_Tankering_Optimizer.xlsx: a backward pass with the per-hour burn penalty for carrying extra fuel, per-stop candidates (buy only what is needed, buy the waiver minimum, or tanker for legs ahead, capped at max fuel) with the waiver-credit rule, then an exhaustive search. The baseline buys only what each leg needs and pays every fee.</p><p>Weights (BOW, payload, MTOW, MLW, ramp) are typical values — enter your tail’s actual BOW in Setup › Aircraft profiles.</p><p class="muted">Planning tool — always verify against flight-plan fuel.</p></div>'+
  '<h2>Prices &amp; handling</h2><div class="card"><p>Contract prices and the shared FBO Handling table come from the private repo adibiase/fuel-prices with your GitHub token. The app checks for changes on open and while open, downloads only changed files, and keeps everything on this device so it works offline. Values you type on a leg always win.</p></div>'+
  '<h2>Reports</h2><div class="card"><p>Share › Email opens your mail app with the plan as text; Export PDF saves a one-page US Letter PDF; Share PDF attaches it where the browser allows (otherwise it downloads first, then opens mail).</p></div>'+verHtml()+'</div>'}
+/* ---- bottom bar pinning (iOS Safari / home-screen app) ----
+ iOS 26 Safari can leave position:fixed bottom bars at their keyboard-open position after the on-screen keyboard closes
+ (the layer keeps a stale layout-viewport height, so the bar floats ~keyboard height above the bottom).
+ Fix: hide the bar while a text field has focus (keyboard up), and on keyboard close / viewport change force a fresh
+ fixed-layer layout (display toggle + 1px scroll nudge) once the visual viewport has settled. */
+var BAR_T=null;
+function barEditing(){var a=typeof document!=="undefined"&&document.activeElement;return !!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName||"")&&!/^(checkbox|radio|button|submit|range|color|file)$/i.test(a.type||""))}
+function barPin(){var b=typeof document!=="undefined"&&document.querySelector&&document.querySelector(".sticky");if(!b||!b.style)return;
+ if(document.body&&document.body.classList)document.body.classList.toggle("kb",barEditing());
+ b.style.display="none";void b.offsetHeight;b.style.display="";
+ try{var y=window.scrollY||0;if(window.scrollTo){window.scrollTo(window.scrollX||0,y+1);window.scrollTo(window.scrollX||0,y)}}catch(x){}}
+/* symptom check: the bar's bottom edge must sit on the visible viewport bottom (visualViewport when available) */
+function barOff(){var b=typeof document!=="undefined"&&document.querySelector&&document.querySelector(".sticky");if(!b||!b.getBoundingClientRect||barEditing())return 0;var r=b.getBoundingClientRect();if(!r||!r.height)return 0;
+ var vv=window.visualViewport,vb=vv?vv.height+(vv.offsetTop||0):(window.innerHeight||0);if(!vb)return 0;return Math.round(vb-r.bottom)}
+var BAR_N=[];function barCheck(){var d=barOff();if(Math.abs(d)<=2)return false;var now=Date.now();BAR_N=BAR_N.filter(function(t){return now-t<5000});if(BAR_N.length>=3)return false;BAR_N.push(now);barPin();return true}
+function barPinSoon(ms){if(typeof setTimeout!=="function")return;if(BAR_T)clearTimeout(BAR_T);BAR_T=setTimeout(function(){BAR_T=null;barPin()},ms==null?250:ms)}
+(function(){if(typeof window==="undefined"||!window.addEventListener||typeof document==="undefined"||!document.addEventListener)return;
+ document.addEventListener("focusin",function(){if(barEditing()&&document.body&&document.body.classList)document.body.classList.add("kb")});
+ document.addEventListener("focusout",function(){barPinSoon(300)});
+ var vv=window.visualViewport;if(vv&&vv.addEventListener){vv.addEventListener("resize",function(){barPinSoon(200)})}
+ var SC=null;window.addEventListener("scroll",function(){if(SC)clearTimeout(SC);SC=setTimeout(function(){SC=null;barCheck()},180)},{passive:true});
+ window.addEventListener("orientationchange",function(){barPinSoon(400)});window.addEventListener("pageshow",function(){barPinSoon(100)});
+ document.addEventListener("visibilitychange",function(){if(!document.hidden)barPinSoon(100)})})();
 (function(){if(typeof document==="undefined"||!document.head||!document.createElement)return;var st=document.createElement("style");st.textContent=
- "html{scroll-padding-bottom:calc(120px + env(safe-area-inset-bottom))}body{padding-bottom:calc(120px + env(safe-area-inset-bottom))!important}body.gate .sticky{display:none}"+
+ "html{scroll-padding-bottom:calc(120px + env(safe-area-inset-bottom))}body{padding-bottom:calc(120px + env(safe-area-inset-bottom))!important}body.gate .sticky,body.kb .sticky{display:none}"+
+ "#sec-res{scroll-margin-top:16px}.sticky{position:fixed!important;top:auto!important;bottom:0!important;left:0;right:0;transform:none;margin:0}"+
  ".barbtn{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;width:100%;cursor:pointer;min-height:44px}"+
  ".undo{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));max-width:616px;margin:0 auto;z-index:20;display:flex;align-items:center;gap:10px;background:#1c1c1e;color:#fff;border-radius:12px;padding:8px 12px;box-shadow:0 4px 18px rgba(0,0,0,.3)}.undo span{flex:1;font-size:14px}.undo .btn{min-height:36px}.undo .lk{color:#fff}"+
  ".authchip{font-size:12px;padding:6px 10px;border-radius:9px;background:var(--in);color:var(--t2);margin:4px 0 8px}.signin{max-width:520px;margin:0 auto;padding-top:24px}.signin .btn.full{margin-top:12px}"+
