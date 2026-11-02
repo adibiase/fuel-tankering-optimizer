@@ -188,7 +188,7 @@ function optimize(inp){
   out.altSavings=alt-best.obj;
   return out;}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.02.1156",APP_BUILT="2026-11-02 11:56";
+var APP_VERSION="2026.11.02.1407",APP_BUILT="2026-11-02 14:07";
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -576,7 +576,7 @@ function render(){if(authNeeded()){signinRender();return}if(typeof document!=="u
  if(typeof document!=="undefined"&&document.body&&document.body.classList)document.body.classList.toggle("desk",dk);
  var ae=typeof document!=="undefined"&&document.activeElement,fp=ae&&ae.getAttribute&&ae.getAttribute("data-p"),ss=null;try{ss=fp?[ae.selectionStart,ae.selectionEnd]:null}catch(x){}
  var rc=$(".rcol"),ry=rc?rc.scrollTop:0;
- h=updHtml()+staleHtml()+authBanner()+navHtml()+(S.page==="fbo"?fhPageHtml():S.page==="setup"?'<div class="setup">'+hSetup+'</div>':S.page==="help"?helpHtml():h)+ghToastHtml()+undoHtml();var y=window.scrollY;$("#app").innerHTML=h;window.scrollTo(0,y);rc=$(".rcol");if(rc&&ry)rc.scrollTop=ry;
+ h=updHtml()+staleHtml()+authBanner()+navHtml()+(S.page==="fbo"?fhPageHtml():S.page==="an"?'<div class="anp">'+anPageHtml()+'</div>':S.page==="setup"?'<div class="setup">'+hSetup+'</div>':S.page==="help"?helpHtml():h)+ghToastHtml()+undoHtml();var y=window.scrollY;$("#app").innerHTML=h;window.scrollTo(0,y);rc=$(".rcol");if(rc&&ry)rc.scrollTop=ry;
  if(fp){var ne=$('[data-p="'+fp+'"]');if(ne&&ne.focus){ne.focus();try{if(ss&&ss[0]!=null)ne.setSelectionRange(ss[0],ss[1])}catch(x){}}}
  bar(r)}
 function signinRender(){if(typeof document!=="undefined"&&document.body&&document.body.classList)document.body.classList.add("gate");$("#app").innerHTML=signinHtml();var b=$("#bar");if(b)b.innerHTML=""}
@@ -592,8 +592,8 @@ function legInput(p){var m=p.match(/^legs\.(\d+)\.(from|to|wind|hours|trip|reser
  if(f==="hours"&&!l.tripManual){l.trip=calcTrip(l);el=document.querySelector('[data-p="legs.'+i+'.trip"]');if(el)el.value=l.trip}
  if(f==="waiver"){el=document.querySelector("#wvh"+i);if(el)el.innerHTML=wvHint(l)}else if(f==="reserveLb"){el=document.querySelector("#rh"+i);if(el)el.innerHTML=resHint(l)}else{el=document.querySelector("#th"+i);if(el)el.innerHTML=tripHint(l)}}
 function setPath(p,v){var k=p.split("."),o=S;for(var i=0;i<k.length-1;i++)o=o[k[i]];o[k[k.length-1]]=v}
-document.addEventListener("input",function(e){var p=e.target.getAttribute("data-p");if(!p||e.target.tagName==="SELECT")return;var t=e.target;if(/^legs\.\d+\.(from|to)$/.test(p)){var v=t.value,n=icaoNorm(v);if(n!==v){var c=t.selectionStart;c=c==null?n.length:icaoNorm(v.slice(0,c)).length;t.value=n;try{t.setSelectionRange&&t.setSelectionRange(c,c)}catch(x){}}}var mm=p.match(/^legs\.(\d+)\.(from|to)$/);if(mm){var lg=S.legs[+mm[1]];lg[mm[2]+"T"]=t.value;lg[mm[2]]=aptIcao(t.value)}else setPath(p,t.value);if(/^fh(F|Form)\./.test(p)){if(/^fhF\./.test(p)){var ft=$("#fhtab");if(ft)ft.innerHTML=fhTableHtml()}save();return}var pm=p.match(/^legs\.(\d+)\.(price|fee|waiver)$/);if(pm){var lp=S.legs[+pm[1]];if(pm[2]==="price"){(lp.ovMan=lp.ovMan||{}).price=1;if(lp.pb){lp.pbPrev={f:lp.pb.f,from:lp.from};delete lp.pb;var se=document.querySelector('[data-pb="'+pm[1]+'"]');if(se)se.value="manual"}}else fhLegEdit(+pm[1])}legInput(p);save();bar(compute())});
-document.addEventListener("change",function(e){var t=e.target,p=t.getAttribute("data-p");
+document.addEventListener("input",function(e){if(anOnInput(e.target))return;var p=e.target.getAttribute("data-p");if(!p||e.target.tagName==="SELECT")return;var t=e.target;if(/^legs\.\d+\.(from|to)$/.test(p)){var v=t.value,n=icaoNorm(v);if(n!==v){var c=t.selectionStart;c=c==null?n.length:icaoNorm(v.slice(0,c)).length;t.value=n;try{t.setSelectionRange&&t.setSelectionRange(c,c)}catch(x){}}}var mm=p.match(/^legs\.(\d+)\.(from|to)$/);if(mm){var lg=S.legs[+mm[1]];lg[mm[2]+"T"]=t.value;lg[mm[2]]=aptIcao(t.value)}else setPath(p,t.value);if(/^fh(F|Form)\./.test(p)){if(/^fhF\./.test(p)){var ft=$("#fhtab");if(ft)ft.innerHTML=fhTableHtml()}save();return}var pm=p.match(/^legs\.(\d+)\.(price|fee|waiver)$/);if(pm){var lp=S.legs[+pm[1]];if(pm[2]==="price"){(lp.ovMan=lp.ovMan||{}).price=1;if(lp.pb){lp.pbPrev={f:lp.pb.f,from:lp.from};delete lp.pb;var se=document.querySelector('[data-pb="'+pm[1]+'"]');if(se)se.value="manual"}}else fhLegEdit(+pm[1])}legInput(p);save();bar(compute())});
+document.addEventListener("change",function(e){if(anOnChange(e.target))return;var t=e.target,p=t.getAttribute("data-p");
  if(p){var mm=p.match(/^legs\.(\d+)\.(from|to)$/);if(mm){var lg=S.legs[+mm[1]];lg[mm[2]+"T"]=icaoNorm(t.value);lg[mm[2]]=aptIcao(t.value)}else setPath(p,t.tagName==="SELECT"?+t.value:t.value)}else if(t.id==="cz")S.chargeZero=t.checked;else if(t.id==="tokexp"){var ar=authRec();if(ar){var ev=Date.parse(String(t.value||"")+"T23:59:00");ar.exp=isFinite(ev)?ev:null;ar.expMan=!!ar.exp;authSetRec(ar)}}
  else if(t.hasAttribute&&t.hasAttribute("data-pb")){var ip=+t.getAttribute("data-pb");pbPick(ip,t.value);if(S.legs[ip])S.legs[ip].pbExplicit=true}
  else if(t.hasAttribute&&t.hasAttribute("data-fhf")){(S.fhF=S.fhF||{})[t.getAttribute("data-fhf")]=t.value}
@@ -617,7 +617,7 @@ document.addEventListener("change",function(e){var t=e.target,p=t.getAttribute("
  else if(t.id==="pbhdr"){PB.pending.header=t.value==="1"}else if(t.id==="pbct"){PB.pending.codeType=t.value;return}else if(t.id==="pbname"){PB.pending.name=t.value;return}
  else if(t.id==="pbfile"){var fl=t.files&&t.files[0];if(!fl)return;PB.busy=true;render();var rd=new FileReader(),fin=function(){PB.busy=false;render();save()};rd.onload=function(){setTimeout(function(){fileRows(fl.name,rd.result).then(function(rows){pbHandleRows(rows,fl.name,fin)},function(er){PB.err=er.message||"Could not read the file.";fin()})},20)};rd.onerror=function(){PB.busy=false;PB.err="Could not read the file.";render()};rd.readAsArrayBuffer(fl);return}
  else return;render();save()});
-document.addEventListener("click",function(e){var t=e.target.closest("button");if(!t){var tr=e.target.closest&&e.target.closest("tr[data-fhrow]");if(tr){var rw=FH_LAST[+tr.getAttribute("data-fhrow")];if(rw){fhLoadRow(rw);render();save();window.scrollTo(0,0)}}return}var d;
+document.addEventListener("click",function(e){if(anOnClick(e.target))return;var t=e.target.closest("button");if(!t){var tr=e.target.closest&&e.target.closest("tr[data-fhrow]");if(tr){var rw=FH_LAST[+tr.getAttribute("data-fhrow")];if(rw){fhLoadRow(rw);render();save();window.scrollTo(0,0)}}return}var d;
  if(t.hasAttribute("data-fhz")){fhConfirmZero(+t.getAttribute("data-fhz"));render();save();return}
  if(t.hasAttribute("data-fhsug")){fhUseSug(+t.getAttribute("data-fhsug"));render();save();return}
  if(t.id==="sisubmit"){var si0=$("#sitok");signIn(si0&&si0.value,function(){render();save()});render();return}
@@ -786,7 +786,7 @@ function pbDb(cb){var I=typeof indexedDB!=="undefined"?indexedDB:null;if(!I){cb(
   q.onblocked=function(){ret(null)};setTimeout(function(){ret(null)},8000)}catch(e){cb(null)}}   // blocked upgrade (old tab open) / stuck open → in-memory fallback instead of hanging
 function pbIndex(){PB.idx={};PB.vendors.forEach(function(v){v.offers.forEach(function(o){(PB.idx[o.a]=PB.idx[o.a]||[]).push({v:v,o:o})})})}
 function pbLoad(cb){pbDb(function(db){if(!db){cb&&cb();return}try{var out=[],cur=db.transaction("vendors","readonly").objectStore("vendors").openCursor();
- cur.onsuccess=function(){var c=cur.result;if(c){out.push(c.value);c.continue()}else{var have={};PB.vendors.forEach(function(v){have[v.id]=1});HS.list=HS.list.concat(out.filter(function(v){return v.kind==="handling"&&!HS.list.some(function(x){return x.id===v.id})}));var stale=out.filter(function(v){return v.src&&ghIgnored(String(v.src.path||"").split("/")[0])});stale.forEach(function(v){try{db.transaction("vendors","readwrite").objectStore("vendors").delete(v.id)}catch(e){}});out=out.filter(function(v){return v.kind!=="handling"&&stale.indexOf(v)<0});PB.vendors=PB.vendors.concat(out.filter(function(v){return !have[v.id]}));pbIndex();pbRefreshLegs();cb&&cb()}};cur.onerror=function(){cb&&cb()}}catch(e){cb&&cb()}})}
+ cur.onsuccess=function(){var c=cur.result;if(c){if(!c.value||c.value.kind!=="history")out.push(c.value);c.continue()}else{var have={};PB.vendors.forEach(function(v){have[v.id]=1});HS.list=HS.list.concat(out.filter(function(v){return v.kind==="handling"&&!HS.list.some(function(x){return x.id===v.id})}));var stale=out.filter(function(v){return v.src&&ghIgnored(String(v.src.path||"").split("/")[0])});stale.forEach(function(v){try{db.transaction("vendors","readwrite").objectStore("vendors").delete(v.id)}catch(e){}});out=out.filter(function(v){return v.kind!=="handling"&&stale.indexOf(v)<0});PB.vendors=PB.vendors.concat(out.filter(function(v){return !have[v.id]}));pbIndex();pbRefreshLegs();cb&&cb()}};cur.onerror=function(){cb&&cb()}}catch(e){cb&&cb()}})}
 function pbPut(v,cb){PB.vendors=PB.vendors.filter(function(x){return x.id!==v.id}).concat([v]);pbIndex();pbRefreshLegs();cb&&cb();  // in memory now; saved to IndexedDB in the background
  pbDb(function(db){if(!db)return;try{var tx=db.transaction("vendors","readwrite");tx.objectStore("vendors").put(v);tx.onerror=function(){PB.err="Could not save the price book on this device (storage full or private mode) — it will be gone after reload.";render()}}catch(e){}})}
 function pbDel(id,cb){PB.vendors=PB.vendors.filter(function(x){return x.id!==id});pbIndex();
@@ -1414,7 +1414,7 @@ function fhPageHtml(){var f=fhForm(),E=S.fhErr||{},g=ghCfg(),ic=f.apt?aptIcao(f.
  h+='<div class="card"><b>Available handling data</b><div class="row3 fhf"><div><label>Filter</label><input data-p="fhF.q" value="'+esc(F.q)+'" placeholder="airport, FBO or city" autocapitalize="off"></div><div><label>Aircraft</label><select data-fhf="ac"><option value="">All</option>'+FH_ACS.map(function(a){return '<option'+(F.ac===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div><div><label>Source</label><select data-fhf="src"><option value="">All</option>'+FH_SRCS.map(function(a){return '<option'+(F.src===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div></div><div id="fhtab">'+fhTableHtml()+'</div><p class="muted">Tap a row to load it into the form. This table is the primary source of handling fee and waiver gallons for every leg (per aircraft). Typing a fee or waiver on a leg card updates this table automatically. Each month: Import Signature monthly CSV → review the diff → Apply. Rows from the raw Signature file (suggestion) are only offered on a leg with no table entry. Direct fuel at KLBX, KMBS and KBTR is treated as no handling fee.</p></div>';
  return h}
 function goSetup(w){S.page='setup';if(w==='pb')S.pbOpen=true;render();save();var e=((w==='gh'||w==='acct')&&$('#ghtok'))||$('#sec-'+(w==='gh'?'acct':w));if(e&&e.scrollIntoView)e.scrollIntoView({block:'start'});else window.scrollTo(0,0)}
-function navHtml(){var p=S.page||"plan";return '<div class="seg nav">'+[["plan","Planner"],["fbo","FBO Handling"],["setup","Setup"]].map(function(x){return '<button data-page="'+x[0]+'" class="'+(p===x[0]?"on":"")+'">'+x[1]+'</button>'}).join("")+'</div>'}
+function navHtml(){var p=S.page||"plan";return '<div class="seg nav">'+[["plan","Planner"],["fbo","FBO Handling"],["an","Analytics"],["setup","Setup"]].map(function(x){return '<button data-page="'+x[0]+'" class="'+(p===x[0]?"on":"")+'">'+x[1]+'</button>'}).join("")+'</div>'}
 function fhSubmit(){var v=fhValidate(fhForm());S.fhErr=v.errs;S.fhMsg="";if(!v.rows.length)return false;var ed=S.fhEdit,rows=v.rows.map(function(r){r.source="Manual";return r});
  if(ed&&!v.rows.some(function(r){return fhKey(r)===fhKey(ed)})&&ed.tab)rows.push({airport:ed.airport,fbo:ed.fbo,aircraft:ed.aircraft,del:true});   // key changed → move
  fhQueue(rows);S.fhMsg=(ed?"Saved ":"Added ")+v.rows.map(function(r){return r.airport+" "+r.fbo+" ("+r.aircraft+")"}).join(", ");S.fhEdit=null;S.fhForm=null;S.fhErr={};return true}
@@ -1430,6 +1430,93 @@ function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from Git
  h+='<div class="row"><button class="btn pri" id="ghref"'+(g.busy||!tok?' disabled':'')+'>'+(g.busy?'⏳ Checking…':(g.folders?'↻ Refresh now':'Connect & load'))+'</button><button class="btn" id="ghlist"'+(g.busy||!tok?' disabled':'')+'>List vendors</button></div>';
  h+='<p class="muted">'+(ghAutoMin()?'Checks GitHub on open, every '+ghAutoMin()+' min while the app is open, and when you return to it (one small request; files download only when they changed). New prices and handling schedules are imported and the plan is recalculated; values you typed stay.':'Checks GitHub when the app opens (at most every 6 hours) and downloads a file only when it changed.')+' Offline, the prices saved on this device are used.</p>';
  return h+'</div>'}
+/* ---- Analytics: week-to-week $/gal heat grid from the private repo's weekly history (history/index.json + <vendor>/history/<date>.csv) ----
+   Loaded lazily when the Analytics tab opens; each history file is parsed with the same pbDetect/pbBuild pipeline as latest.csv,
+   reduced to per-airport tier ladders and cached on this device (IndexedDB, kind "history") for offline use. */
+var AN={files:{},idx:null,busy:false,started:false,err:null,note:null,sel:null,at:0},AN_MAXW=26,AN_IDX="history/index.json";
+var AN_VN={worldfuel:"World Fuel",atlantic:"Atlantic Aviation",direct:"Direct",caa:"CAA",signature:"Signature",jetaviation:"Jet Aviation"};
+function anCfg(){var a=S.an=S.an||{};if(!a.v)a.v="all";if(!a.basis)a.basis="first";if(!(+a.up>0))a.up=1000;if(!a.scale)a.scale="row";if(a.q==null)a.q="";if(!a.sort)a.sort="apt";return a}
+function anVName(k){return AN_VN[k]||String(k||"").replace(/^./,function(c){return c.toUpperCase()})}
+function anVKey(v){var p=v&&v.src&&typeof v.src==="object"&&v.src.path;return p?String(p).split("/")[0]:(v.id==="sigfuel"?"signature":v.id)}
+/* Monday (Central calendar date) of the week holding YYYY-MM-DD */
+function anMon(d){var m=String(d||"").match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return null;var t=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));t.setUTCDate(t.getUTCDate()-(t.getUTCDay()+6)%7);return t.toISOString().slice(0,10)}
+function anAddW(w,n){var t=new Date(w+"T00:00:00Z");t.setUTCDate(t.getUTCDate()+7*n);return t.toISOString().slice(0,10)}
+/* price-book (pbBuild result) → {ICAO:[tier ladder,…]} (Jet fuel only; additive rows only when the setting is on) */
+function anCompact(v){var ap={};(v.offers||[]).forEach(function(o){if(o.x)return;if(!o.t||!o.t.length)return;(ap[o.a]=ap[o.a]||[]).push(o.t.map(function(t){return t.slice(0,3)}))});return ap}
+function anParse(path,rows,date){if(fhDetect(rows)||hdlDetect(rows))return null;var p=pbDetect(rows);if(!p)return null;return anCompact(pbBuild(rows,p,{received:date}))}
+function anPrice(t,a){a=a||anCfg();return a.basis==="up"?pbTierPrice(t,+a.up):t[0][1]}
+/* the sources: history files, plus the vendor books loaded now (latest.csv) when that vendor/date is not in history yet */
+function anSources(){var out=[],seen={};Object.keys(AN.files).forEach(function(p){var f=AN.files[p];if(!f||!f.ap)return;out.push({vendor:f.vendor,date:f.date,ap:f.ap,hist:true});seen[f.vendor+"|"+f.date]=1});
+ PB.vendors.forEach(function(v){var k=anVKey(v),gv=S.gh&&S.gh.v&&S.gh.v[k],d=v.received||(gv&&gv.cdate)||(v.src&&typeof v.src==="object"&&+v.src.at?ghDay(v.src.at):null)||String(v.imported||"").slice(0,10);if(!d||seen[k+"|"+d])return;var hv=out.some(function(s){return s.vendor===k&&s.date>=d});if(hv)return;out.push({vendor:k,date:d,ap:anCompact(v),hist:false})});return out}
+function ghDay(t){var D=new Date(t);return D.getFullYear()+"-"+p2(D.getMonth()+1)+"-"+p2(D.getDate())}
+function anVendors(){var o={};anSources().forEach(function(s){o[s.vendor]=1});return Object.keys(o).sort()}
+/* grid model: weeks (Mon-start, contiguous, last AN_MAXW), rows {a, c:{week:{p,v}}}; one file per vendor per week (latest date wins) */
+function anGrid(a){a=a||anCfg();var src=anSources().filter(function(s){return a.v==="all"||s.vendor===a.v}),pick={};
+ src.forEach(function(s){var w=anMon(s.date);if(!w)return;var k=s.vendor+"|"+w;if(!pick[k]||s.date>pick[k].date)pick[k]=s});
+ var cells={},wk={};Object.keys(pick).forEach(function(k){var s=pick[k],w=anMon(s.date);wk[w]=1;Object.keys(s.ap).forEach(function(ic){var best=null;s.ap[ic].forEach(function(t){var p=anPrice(t,a);if(p>0&&(best==null||p<best))best=p});if(best==null)return;var r=cells[ic]=cells[ic]||{},c=r[w];if(!c||best<c.p)r[w]={p:best,v:s.vendor,d:s.date}})});
+ var ws=Object.keys(wk).sort(),weeks=[];if(ws.length){for(var w=ws[0];w<=ws[ws.length-1];w=anAddW(w,1))weeks.push(w)}weeks=weeks.slice(-AN_MAXW);
+ var trip={};if(a.trip)(S.legs||[]).forEach(function(l){if(l.from)trip[l.from]=1;if(l.to)trip[l.to]=1});var q=String(a.q||"").trim().toUpperCase();
+ var rows=Object.keys(cells).filter(function(ic){return (!q||ic.indexOf(q)>=0)&&(!a.trip||trip[ic])&&weeks.some(function(w){return cells[ic][w]})}).map(function(ic){var c=cells[ic],have=weeks.filter(function(w){return c[w]}),last=have.length?c[have[have.length-1]]:null,prev=have.length>1?c[have[have.length-2]]:null;return{a:ic,c:c,last:last,chg:last&&prev?last.p-prev.p:null}});
+ rows.sort(a.sort==="latest"?function(x,y){return (x.last?x.last.p:1e9)-(y.last?y.last.p:1e9)||(x.a<y.a?-1:1)}:a.sort==="chg"?function(x,y){return Math.abs(y.chg||0)-Math.abs(x.chg||0)||(x.a<y.a?-1:1)}:function(x,y){return x.a<y.a?-1:1});
+ var all=[];rows.forEach(function(r){weeks.forEach(function(w){if(r.c[w])all.push(r.c[w].p)})});all.sort(function(x,y){return x-y});
+ var pc=function(f){return all.length?all[Math.min(all.length-1,Math.max(0,Math.round(f*(all.length-1))))]:0};
+ return{weeks:weeks,rows:rows,gmin:pc(0.05),gmax:pc(0.95),n:all.length}}
+/* 0 = cheapest (green) … 1 = most expensive (red) */
+function anFrac(r,w,G,a){var c=r.c[w];if(!c)return null;var lo,hi;if((a||anCfg()).scale==="row"){lo=1e9;hi=-1e9;G.weeks.forEach(function(x){var y=r.c[x];if(y){lo=Math.min(lo,y.p);hi=Math.max(hi,y.p)}})}else{lo=G.gmin;hi=G.gmax}
+ if(!(hi-lo>1e-9))return 0.5;return Math.max(0,Math.min(1,(c.p-lo)/(hi-lo)))}
+function anColor(f){return f==null?"":"hsla("+Math.round(120*(1-f))+",68%,46%,.42)"}
+function anPrev(r,G,w){var i=G.weeks.indexOf(w);for(var j=i-1;j>=0;j--)if(r.c[G.weeks[j]])return {w:G.weeks[j],c:r.c[G.weeks[j]]};return null}
+function anDelta(d){return (d>=0?"+$":"−$")+Math.abs(d).toFixed(2)}
+function anTip(r,G,w){var c=r.c[w];if(!c)return r.a+" · week of "+pbDTxt(w)+": no price";var pv=anPrev(r,G,w);return r.a+" · week of "+pbDTxt(w)+": $"+pbP4(c.p)+"/gal · "+anVName(c.v)+(pv?" · "+anDelta(c.p-pv.c.p)+" vs "+(pv.w===anAddW(w,-1)?"prior week":"week of "+pbDTxt(pv.w)):" · first week on file")}
+function anDetail(G,a){if(!AN.sel)return"";var s=AN.sel.split("|"),r=G.rows.filter(function(x){return x.a===s[0]})[0];if(!r||G.weeks.indexOf(s[1])<0)return"";var c=r.c[s[1]],pv=c&&anPrev(r,G,s[1]);
+ return '<div class="card andet" role="status"><b>'+esc(r.a)+'</b> · week of '+pbDTxt(s[1])+'<div>'+(c?'<b>$'+pbP4(c.p)+'</b>/gal · '+esc(anVName(c.v))+' <span class="lsub">file '+pbDTxt(c.d)+'</span><br>'+(pv?(pv.c.p<=c.p?'<span style="color:var(--bad)">':'<span style="color:var(--ok)">')+anDelta(c.p-pv.c.p)+'</span> vs '+(pv.w===anAddW(s[1],-1)?'prior week':'week of '+pbDTxt(pv.w))+' ($'+pbP4(pv.c.p)+', '+esc(anVName(pv.c.v))+')':'First week on file'):'No price this week')+'</div><button class="lk" id="anselx">Close</button></div>'}
+function anPageHtml(){var a=anCfg();if(!AN.started&&typeof setTimeout==="function"){AN.started=true;var t0=setTimeout(function(){anLoad(function(){render()})},0);if(t0&&t0.unref)t0.unref()}
+ var G=anGrid(a),vs=anVendors(),h='<h2>Analytics</h2><p class="muted">Cost per gallon by airport, week by week (weeks start Monday, Central time). Green = cheaper, red = more expensive.'+(a.basis==="up"?' Price at '+gal(a.up)+' gal using each tier ladder.':' First-tier (posted) price.')+'</p>';
+ h+='<div class="card anc"><div class="row"><div><label>Vendor</label><select id="anv"><option value="all"'+(a.v==="all"?' selected':'')+'>All (cheapest)</option>'+vs.map(function(v){return '<option value="'+esc(v)+'"'+(a.v===v?' selected':'')+'>'+esc(anVName(v))+'</option>'}).join("")+'</select></div>'+
+  '<div><label>Price basis</label><select id="anbasis"><option value="first"'+(a.basis!=="up"?' selected':'')+'>First tier (posted)</option><option value="up"'+(a.basis==="up"?' selected':'')+'>At an uplift…</option></select></div>'+
+  (a.basis==="up"?'<div><label>Uplift (gal)</label><input id="anup" inputmode="decimal" value="'+esc(a.up)+'"></div>':'')+
+  '<div><label>Color scale</label><select id="anscale"><option value="row"'+(a.scale==="row"?' selected':'')+'>Per airport (relative)</option><option value="global"'+(a.scale==="global"?' selected':'')+'>Global</option></select></div>'+
+  '<div><label>Sort</label><select id="ansort"><option value="apt"'+(a.sort==="apt"?' selected':'')+'>Airport</option><option value="latest"'+(a.sort==="latest"?' selected':'')+'>Latest price</option><option value="chg"'+(a.sort==="chg"?' selected':'')+'>Biggest change</option></select></div></div>'+
+  '<div class="row"><div><label>Find airport</label><input id="anq" value="'+esc(a.q)+'" placeholder="e.g. KTEB" autocapitalize="characters" autocomplete="off"></div></div>'+
+  '<div class="tog"><span>Only airports on this trip’s legs</span><label class="sw"><input type="checkbox" id="antrip"'+(a.trip?' checked':'')+'><span></span></label></div></div>';
+ if(AN.busy)h+='<p class="muted">⏳ Loading price history…</p>';if(AN.err)h+='<div class="card warn">⚠️ '+esc(AN.err)+'</div>';
+ var nh=Object.keys(AN.files).length;if(!AN.busy&&!nh)h+='<div class="card anote">ℹ️ No price history yet — showing just the latest week. History builds up weekly as new vendor files arrive.</div>';else if(AN.note)h+='<p class="muted">'+esc(AN.note)+'</p>';
+ h+='<div id="andet">'+anDetail(G,a)+'</div>';
+ if(!G.rows.length)return h+'<div class="card"><p class="muted" style="margin:0">'+(G.n||anSources().length?'No airports match the filter.':'No prices loaded yet. Sign in and load contract prices (Setup › Contract prices).')+'</p></div>';
+ h+='<p class="sm">'+gal(G.rows.length)+' airport'+(G.rows.length>1?'s':'')+' · '+G.weeks.length+' week'+(G.weeks.length>1?'s':'')+' <span class="anleg"><i style="background:'+anColor(0)+'"></i>cheap <i style="background:'+anColor(.5)+'"></i> <i style="background:'+anColor(1)+'"></i>expensive <i class="anna"></i>no data</span></p>';
+ h+='<div class="anw"><table class="ang"><thead><tr><th class="anst">Airport</th>'+G.weeks.map(function(w){return '<th>'+pbDTxt(w,1)+'</th>'}).join("")+'<th>Δ wk</th></tr></thead><tbody>';
+ G.rows.forEach(function(r){h+='<tr><th class="anst" scope="row">'+esc(r.a)+'</th>'+G.weeks.map(function(w){var c=r.c[w],k=r.a+"|"+w;return c?'<td data-anc="'+esc(k)+'" title="'+esc(anTip(r,G,w))+'" style="background:'+anColor(anFrac(r,w,G,a))+'"'+(AN.sel===k?' class="on"':'')+'>'+c.p.toFixed(2)+'</td>':'<td class="anna" title="'+esc(anTip(r,G,w))+'"></td>'}).join("")+'<td class="anchg">'+(r.chg==null?'—':'<span style="color:var('+(r.chg>0?'--bad':r.chg<0?'--ok':'--t2')+')">'+anDelta(r.chg)+'</span>')+'</td></tr>'});
+ return h+'</tbody></table></div><p class="muted">Tap a cell for the week-over-week change. Prices are saved on this device for offline use.</p>'}
+/* IndexedDB cache (same store as the price books, kind "history") */
+function anCachePut(f){pbDb(function(db){if(!db)return;try{db.transaction("vendors","readwrite").objectStore("vendors").put({id:"hist|"+f.path,kind:"history",path:f.path,vendor:f.vendor,date:f.date,rows:f.rows,ap:f.ap})}catch(e){}})}
+function anCacheLoad(cb){pbDb(function(db){if(!db){cb();return}try{var cur=db.transaction("vendors","readonly").objectStore("vendors").openCursor();cur.onsuccess=function(){var c=cur.result;if(c){var v=c.value;if(v&&v.kind==="history"&&!AN.files[v.path])AN.files[v.path]=v;c.continue()}else cb()};cur.onerror=function(){cb()}}catch(e){cb()}})}
+function anIdxParse(d){try{var j=typeof d==="string"?JSON.parse(d):d;if(j&&!Array.isArray(j)&&d&&d.byteLength!=null)j=JSON.parse(new TextDecoder().decode(d));return j&&Array.isArray(j.files)?j.files.filter(function(f){return f&&f.path&&f.vendor&&/^\d{4}-\d{2}-\d{2}$/.test(f.date||"")}):null}catch(e){return null}}
+function anLoad(cb){if(AN.busy){cb&&cb();return}AN.busy=true;AN.err=null;var fin=function(){AN.busy=false;AN.at=Date.now();cb&&cb()};
+ anCacheLoad(function(){if(!ghTok()||!ghOnline()){AN.note=Object.keys(AN.files).length?"Offline — showing the price history saved on this device.":null;fin();return}
+  ghFetch("contents/"+AN_IDX,"application/vnd.github.raw",function(e,d){
+   if(e){if(e.status===404){AN.idx=[];AN.note=null}else{AN.note=Object.keys(AN.files).length?"Could not check for new history ("+(e.msg||"error")+") — showing what is saved on this device.":null;if(!Object.keys(AN.files).length&&!e.off)AN.err="Could not load price history: "+(e.msg||"error")}fin();return}
+   var L=anIdxParse(d);if(!L){AN.err="history/index.json is not in the expected format.";fin();return}AN.idx=L;
+   var todo=L.filter(function(f){var c=AN.files[f.path];return !c||c.rows!==f.rows||c.date!==f.date}),bad=0;
+   (function next(){if(!todo.length){AN.note=bad?bad+" history file"+(bad>1?"s":"")+" could not be read.":null;fin();return}var f=todo.shift();
+    ghFetch("contents/"+f.path.split("/").map(encodeURIComponent).join("/"),"application/vnd.github.raw",function(e2,t){if(e2||!t){bad++;next();return}
+     Promise.resolve().then(function(){return fileRows(f.path,t)}).then(function(rows){var ap=anParse(f.path,rows,f.date);if(!ap){bad++;return}var o={path:f.path,vendor:f.vendor,date:f.date,rows:f.rows,ap:ap};AN.files[f.path]=o;anCachePut(o)}).catch(function(){bad++}).then(next)},/\.xlsx$/i.test(f.path))})()})})}
+/* hooks called first by the app's shared change / input / click handlers; return true when handled */
+function anOnChange(t){if(!t||!t.id||!/^an(v|basis|scale|sort|trip|up)$/.test(t.id))return false;var a=anCfg();
+ if(t.id==="anv")a.v=t.value;else if(t.id==="anbasis")a.basis=t.value;else if(t.id==="anscale")a.scale=t.value;else if(t.id==="ansort")a.sort=t.value;else if(t.id==="antrip")a.trip=!!t.checked;else if(t.id==="anup"){var u=pbNum(t.value);if(u>0)a.up=Math.round(u)}
+ AN.sel=null;render();save();return true}
+function anOnInput(t){if(!t||t.id!=="anq")return false;anCfg().q=String(t.value||"").toUpperCase();render();save();var q=document.querySelector&&document.querySelector("#anq");if(q&&q.focus){q.focus();try{var n=String(q.value).length;q.setSelectionRange(n,n)}catch(x){}}return true}
+function anOnClick(tg){if(!tg||!tg.closest)return false;var b=tg.closest("button");if(b){if(b.id==="anselx"){AN.sel=null;render();return true}return false}var td=tg.closest("td[data-anc]");if(!td)return false;var k=td.getAttribute("data-anc");AN.sel=AN.sel===k?null:k;render();return true}
+(function(){if(typeof document==="undefined"||!document.head||!document.createElement)return;var st=document.createElement("style");st.textContent=
+ ".anw{overflow:auto;-webkit-overflow-scrolling:touch;max-height:70vh;border:1px solid var(--bd);border-radius:10px;background:var(--card);margin:6px 0}"+
+ ".ang{border-collapse:separate;border-spacing:0;font-size:13px;font-variant-numeric:tabular-nums;min-width:100%}"+
+ ".ang th,.ang td{padding:7px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);min-width:52px}"+
+ ".ang thead th{position:sticky;top:0;z-index:2;background:var(--in);font-size:11px;text-transform:uppercase;color:var(--t2);font-weight:600}"+
+ ".ang .anst{position:sticky;left:0;z-index:1;background:var(--card);text-align:left;font-weight:700;min-width:58px;box-shadow:1px 0 0 var(--bd)}.ang thead .anst{z-index:3;background:var(--in)}"+
+ ".ang td[data-anc]{cursor:pointer}.ang td.on{outline:2px solid var(--ac);outline-offset:-2px;font-weight:700}"+
+ ".ang td.anna,.anleg i.anna{background:repeating-linear-gradient(45deg,var(--in),var(--in) 4px,var(--bd) 4px,var(--bd) 5px)}.ang .anchg{font-weight:600}"+
+ ".anleg{margin-left:8px;white-space:nowrap}.anleg i{display:inline-block;width:14px;height:10px;border-radius:2px;margin:0 3px 0 6px;vertical-align:middle}"+
+ ".andet{margin:8px 0}.andet .lk{margin-top:4px}.anc .row>div{min-width:130px}@media(max-width:420px){.ang{font-size:12px}.ang th,.ang td{padding:6px 5px;min-width:44px}}";
+ document.head.appendChild(st)})();
 fhStaleBoot();authInit();render();if(typeof setTimeout==="function"){var mvt=setTimeout(function(){fhMinRecheck(true)},800);if(mvt&&mvt.unref)mvt.unref()}if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("focus",fhMinRecheck);window.addEventListener("pageshow",fhMinRecheck)}if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!document.hidden)fhMinRecheck()});pbLoad(function(){if(PB.vendors.length){render();save()}if(ghAutoMin())ghTick(function(ch){if(ch)render();save()});else ghAuto()});ghStart();
 if(typeof setTimeout==="function"){var ut=setTimeout(function(){updCheck()},1500);if(ut&&ut.unref)ut.unref()}
 if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("online",function(){if(gateOn()&&ghTok())authBg()});
