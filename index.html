@@ -188,7 +188,7 @@ function optimize(inp){
   out.altSavings=alt-best.obj;
   return out;}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.10.31.0922",APP_BUILT="2026-10-31 09:22";
+var APP_VERSION="2026.11.02.1041",APP_BUILT="2026-11-02 10:41";
 var SAMPLE={ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:5000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -285,7 +285,7 @@ function resHint(l){return '≈ '+gal(resLb(l)/dens())+' gal · '+(resLb(l)<RES_
 function wvHint(l){return blank(l.waiver)?'':'≈ '+gal(num(l.waiver)*dens())+' lb'}
 S.credit=0;S.aircraft.forEach(function(a){var d=WDEF[a.name];if(d&&a.mtow==null)for(var k in d)a[k]=d[k];if(d&&((a.name==='Gulfstream G650ER'&&+a.payload===1600)||(a.name==='Dassault Falcon 2000LXS'&&+a.payload===1200)))a.payload=0});if(!S.view)S.view="auto";if(S.setOpen==null)S.setOpen=false;S.legs.forEach(function(l){delete l.dep;l.from=icaoNorm(l.from);l.to=icaoNorm(l.to);["from","to"].forEach(function(f){if(l[f+"T"]!=null)l[f+"T"]=icaoNorm(l[f+"T"]);var t=l[f+"T"]||l[f];if(t)l[f]=aptIcao(t)});if(l.hoursManual==null)l.hoursManual=!blank(l.hours);if(l.tripManual==null)l.tripManual=!blank(l.trip)});
 ovPurge();fhHeal();   // drop overrides-era saved state (status, errors, toggles, cached rows)
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="fhBusy"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="fhBusy"||k==="fhStale"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
 if(S&&S.gh){delete S.gh.busy;delete S.gh.ovBusy;delete S.gh.runId}   // stale "Checking…" from a run killed mid-check (page closed / iOS suspended) used to lock the button forever
 var $=function(s){return document.querySelector(s)};
 function money(v){return v==null?"n/a":"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -302,7 +302,7 @@ function buildInp(mod){mod=mod||{};var a=S.aircraft[S.ac]||S.aircraft[0],rm=mod.
 /* ---- app version + "new version available" check (same-origin no-cache fetch of this page; never blocks, silent offline) ---- */
 function verHtml(){return '<p class="ver">Version '+esc(APP_VERSION)+(APP_BUILT?' · built '+esc(APP_BUILT)+' CT':'')+'</p>'}
 var UPD={at:0,newer:null,busy:false},UPD_EVERY=10*60e3,UPD_TIMEOUT=8000;
-function updCmp(a,b){return String(a||"").localeCompare(String(b||""),"en",{numeric:true})}
+function updCmp(a,b){return verCmp(a,b)}
 function updCheck(cb,force){cb=cb||function(){};var now=Date.now();if(UPD.busy||(!force&&UPD.at&&now-UPD.at<UPD_EVERY)){cb(null);return}
  var loc=typeof location!=="undefined"?location:(typeof window!=="undefined"&&window.location);if(typeof fetch!=="function"||!loc||!/^https?:/.test(loc.protocol||"")){cb(null);return}
  if(typeof navigator!=="undefined"&&navigator&&navigator.onLine===false){cb(null);return}
@@ -1269,10 +1269,19 @@ function fhRaw(rows){var h=fhHdr(rows);return rows.slice(1).filter(function(r){r
  ["handling_fee","waiver_gal"].forEach(function(f){if(o[f]===""||o[f]==null)o[f]=null;else{var n=pbNum(o[f]);if(isFinite(n))o[f]=n}});if(o.airport)o.airport=String(o.airport).toUpperCase();return o})}
 /* ---- minimum app version (private repo app/min-version.txt): older copies may not write ---- */
 var FH_MINV_PATH="app/min-version.txt";
-function verOlder(a,b){return String(a||"")<String(b||"")}
+function verNorm(v){return String(v==null?"":v).replace(/^\ufeff/,"").trim().split(/\s+/)[0]||""}
+/* segment compare: 2026.10.31.0922 < 2026.10.31.0922b < 2026.10.31.0922c < 2026.10.31.0923; numbers numerically, suffix letters after the bare number */
+function verCmp(a,b){var x=verNorm(a).toLowerCase().match(/\d+|[a-z]+/g)||[],y=verNorm(b).toLowerCase().match(/\d+|[a-z]+/g)||[];
+ for(var i=0;i<Math.max(x.length,y.length);i++){var p=x[i],q=y[i];if(p===q)continue;if(p==null)return -1;if(q==null)return 1;
+  var pn=/^\d/.test(p),qn=/^\d/.test(q);if(pn&&qn){var d=parseInt(p,10)-parseInt(q,10);if(d)return d<0?-1:1;continue}if(pn!==qn)return pn?-1:1;return p<q?-1:1}return 0}
+function verOlder(a,b){var m=verNorm(b);return !!m&&verCmp(a,m)<0}   // block only when this copy < minimum; equal is allowed
+/* re-check the minimum version (load, focus, before saves); a pass clears the banner and sends queued edits */
+var FH_MINV_AT=0;function fhMinRecheck(force){if(!ghTok()||!ghOnline())return;var g=ghCfg(),now=Date.now();if(force!==true&&!g.fhStale&&now-FH_MINV_AT<30000)return;FH_MINV_AT=now;fhMinCheck(function(ok){if(ok&&fhQ().length)fhFlush(function(){render();save()});render();save()})}
 function fhMinCheck(cb){var g=ghCfg();ghFetch("contents/"+FH_MINV_PATH,"application/vnd.github.raw",function(e,d){
  if(e){if(e.status===404){g.minVer=null;g.fhStale=false;cb(true);return}cb(!g.fhStale,e);return}                     // offline: keep the last verdict
- var m=String(typeof d==="string"?d:"").trim().split(/\s+/)[0]||"";g.minVer=m||null;g.fhStale=!!m&&verOlder(APP_VERSION,m);cb(!g.fhStale)})}
+ var m=verNorm(typeof d==="string"?d:"");g.minVer=m||null;g.fhStale=!!m&&verOlder(APP_VERSION,m);cb(!g.fhStale)})}
+/* a verdict saved by an older copy never blocks this one: drop it and re-check */
+function fhStaleBoot(){var g=S.gh;if(!g)return;g.fhStale=false;g.minSha=null}
 function staleHtml(){var g=S.gh||{};return g.fhStale?'<div class="card bad stale"><b>This copy of the app is out of date — reload to update.</b><br><span class="sm">Saving to the shared FBO Handling table is blocked until you reload (this copy '+esc(APP_VERSION)+', minimum '+esc(g.minVer||"?")+'). Your changes are kept on this device.</span><div class="row" style="margin-top:6px"><button class="btn pri" id="stalerel">Reload</button></div></div>':''}
 /* ---- Signature monthly import → FBO Handling table ---- */
 var FH_SIG=null;
@@ -1385,7 +1394,7 @@ function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from Git
  h+='<div class="row"><button class="btn pri" id="ghref"'+(g.busy||!tok?' disabled':'')+'>'+(g.busy?'⏳ Checking…':(g.folders?'↻ Refresh now':'Connect & load'))+'</button><button class="btn" id="ghlist"'+(g.busy||!tok?' disabled':'')+'>List vendors</button></div>';
  h+='<p class="muted">'+(ghAutoMin()?'Checks GitHub on open, every '+ghAutoMin()+' min while the app is open, and when you return to it (one small request; files download only when they changed). New prices and handling schedules are imported and the plan is recalculated; values you typed stay.':'Checks GitHub when the app opens (at most every 6 hours) and downloads a file only when it changed.')+' Offline, the prices saved on this device are used.</p>';
  return h+'</div>'}
-authInit();render();pbLoad(function(){if(PB.vendors.length){render();save()}if(ghAutoMin())ghTick(function(ch){if(ch)render();save()});else ghAuto()});ghStart();
+fhStaleBoot();authInit();render();if(typeof setTimeout==="function"){var mvt=setTimeout(function(){fhMinRecheck(true)},800);if(mvt&&mvt.unref)mvt.unref()}if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("focus",fhMinRecheck);window.addEventListener("pageshow",fhMinRecheck)}if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!document.hidden)fhMinRecheck()});pbLoad(function(){if(PB.vendors.length){render();save()}if(ghAutoMin())ghTick(function(ch){if(ch)render();save()});else ghAuto()});ghStart();
 if(typeof setTimeout==="function"){var ut=setTimeout(function(){updCheck()},1500);if(ut&&ut.unref)ut.unref()}
 if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("online",function(){if(gateOn()&&ghTok())authBg()});
 (function(){var f=S.fcst||{},on=typeof navigator==="undefined"||navigator.onLine!==false;if(typeof fetch==="function"&&on&&S.legs.some(function(l){return legRoute(l)})&&(!f.at||Date.now()-f.at>3600e3))fetchWinds(function(){render();save()})})();
