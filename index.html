@@ -326,7 +326,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.03.0858",APP_BUILT="2026-11-03 08:58";
+var APP_VERSION="2026.11.03.0955",APP_BUILT="2026-11-03 09:55";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -863,7 +863,11 @@ var PB_BUILTIN=[{id:"worldfuel",name:"World Fuel",src:"World Fuel",builtin:true,
  // Jet Aviation: ICAO,Volume Tier,Product,Price,Tail Numbers. Blank ICAO = same airport as the row above (carried down); product trimmed, Jet A only
  // (SAF kept as a reference note, never priced); tiers "1+", "1 - 500", "1,001+" → tier min = first number (ranges may overlap/gap); "All Tails" = every aircraft
  {id:"jetaviation",name:"Jet Aviation",src:"Jet Aviation",builtin:true,header:true,codeType:"auto",country:"United States",fbo:"Jet Aviation",received:true,staleDays:14,carry:true,
-  cols:{code:"ICAO",tier:"Volume Tier",product:"Product",price:"Price",tail:"Tail Numbers"}}];
+  cols:{code:"ICAO",tier:"Volume Tier",product:"Product",price:"Price",tail:"Tail Numbers"}},
+ // Avfuel contract export (DOW4BT - MMDDYY.csv): ICAO (IATA fallback), Fixed Base Operator, FROM/TO gallon tiers (99999+ = open-ended), PRICE $/gal, EFF DATE,
+ // PRODUCT "Jet" or "Jet w/ Additive" (additive = separate offer, hidden unless additive is allowed). No country column; international ICAOs resolve directly.
+ {id:"avfuel",name:"Avfuel",src:"Avfuel",builtin:true,header:true,codeType:"auto",received:true,staleDays:14,
+  cols:{code:"ICAO",iata:"IATA",fbo:"Fixed Base Operator",min:"FROM",max:"TO",price:"PRICE",eff:"EFF DATE",product:"PRODUCT",notes:"NOTES"}}];
 function jaTier(s){var m=String(s==null?"":s).replace(/[,\s"]/g,"").match(/^(\d+)(?:\+|-(\d+))?$/);return m?[+m[1],m[2]!=null?+m[2]:0]:null}
 function pbFileDate(f){var m=String(f||"").match(/(\d{1,2})-(\d{1,2})-(\d{4})(?:-(\d{1,2})-(\d{2})-(\d{2})-?(AM|PM)?)?/i);if(!m||+m[1]>12||+m[2]>31)return null;return m[3]+"-"+p2(+m[1])+"-"+p2(+m[2])}
 var L_PER_GAL=3.78541;
@@ -883,7 +887,7 @@ function pbNum(s){return parseFloat(String(s==null?"":s).replace(/[$,\s]/g,""))}
 function pbFboName(s){s=String(s||"").trim();var n=s.indexOf("-A/")>=0?s.split("-A/")[0]:s.split("/")[0];n=n.trim()||s;
  return n.toLowerCase().replace(/(^|[\s\-\/&(.])([a-z])/g,function(a,b,c){return b+c.toUpperCase()}).replace(/\b([A-Za-z]{2,4})\b/g,function(w){return /^(fbo|fbos|llc|usa|uae|uk|ksa|faa|sa|ltd)$/i.test(w)?(w.toLowerCase()==="ltd"?"Ltd":w.toUpperCase()):(/[aeiouy]/i.test(w)||w.length>3?w:w.toUpperCase())})}
 function pbProduct(notes){var m=String(notes||"").match(/Price for fuel item:\s*([^*]+?)\s*\*\*/i);return m?m[1].trim().toUpperCase():"JET FUEL"}
-function pbProdNorm(p){p=String(p||"").trim().toUpperCase();return /^(JET ?A|JET-A|JETA|JET ?A-?1|JET A1|JETA1)$/.test(p)?"JET FUEL":(p||"JET FUEL")}
+function pbProdNorm(p){p=String(p||"").trim().toUpperCase();return /^(JET|JET ?A|JET-A|JETA|JET ?A-?1|JET A1|JETA1)$/.test(p)?"JET FUEL":(p||"JET FUEL")}
 function pbStale(o){if(!o||!o.r)return false;var a=new Date(o.r+"T00:00:00"),b=new Date(pbToday()+"T00:00:00");return (b-a)/864e5>(o.sd||14)}
 function pbInfoTxt(i){if(!i||i.posted==null)return"";var d=i.discount;return "Posted $"+i.posted.toFixed(2)+(d==null?"":d>=0?" − discount $"+d.toFixed(2):" + $"+Math.abs(d).toFixed(2)+" (negative discount)")}
 function pbFees(notes){var out=[];String(notes||"").replace(/\*\*([\s\S]*?)\*\*/g,function(a,b){if(!/per\s*flight/i.test(b))return;b.replace(/([A-Z][A-Z \-]*?FEE)\s*:\s*([\d.,]+)/g,function(x,k,v){var lb=k.trim().toLowerCase();out.push([lb.charAt(0).toUpperCase()+lb.slice(1),pbNum(v)])})});return out}
@@ -1641,7 +1645,7 @@ function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from Git
    Loaded lazily when the Analytics tab opens; each history file is parsed with the same pbDetect/pbBuild pipeline as latest.csv,
    reduced to per-airport tier ladders and cached on this device (IndexedDB, kind "history") for offline use. */
 var AN={files:{},idx:null,busy:false,started:false,err:null,note:null,sel:null,at:0},AN_MAXW=26,AN_IDX="history/index.json",AN_MON=60,AN_CONC=6,AN_STALE=10*60e3,AN_MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-var AN_VN={worldfuel:"World Fuel",atlantic:"Atlantic Aviation",direct:"Direct",caa:"CAA",signature:"Signature",jetaviation:"Jet Aviation"};
+var AN_VN={worldfuel:"World Fuel",atlantic:"Atlantic Aviation",direct:"Direct",caa:"CAA",signature:"Signature",jetaviation:"Jet Aviation",avfuel:"Avfuel"};
 function anCfg(){var a=S.an=S.an||{};if(!a.v)a.v="all";if(!a.basis)a.basis="first";if(!(+a.up>0))a.up=1000;if(!a.scale)a.scale="row";if(a.q==null)a.q="";if(!a.sort)a.sort="apt";if(a.rng!=="52"&&a.rng!=="all")a.rng="26";if(!a.reg)a.reg="all";if(!a.cty)a.cty="all";return a}
 /* ICAO prefix → [country, region]; longest prefix wins (2 letters, then 1). Unknown → "Other" */
 var AN_RG=[["us","United States"],["ca","Canada"],["mca","Mexico, Central America & Caribbean"],["sa","South America"],["eu","Europe"],["me","Middle East"],["af","Africa"],["as","Asia"],["oc","Oceania"],["ot","Other / unknown"]];
@@ -1659,7 +1663,7 @@ var AN_GEO=(function(){var o={},add=function(rg,s){s.split("|").forEach(function
 function anGeo(ic){ic=String(ic||"").toUpperCase();if(!/^[A-Z]{4}$/.test(ic))return["Unknown","ot"];var g=AN_GEO[ic.slice(0,2)]||AN_GEO[ic.charAt(0)];return g&&g[0]!=="Other"?g:["Unknown","ot"]}
 
 /* vendor tag: short label + fixed colour per vendor */
-var AN_VT={worldfuel:["WFS","#1f6feb"],signature:["Sig","#7b3fd6"],atlantic:["Atl","#0a8754"],caa:["CAA","#c2410c"],jetaviation:["Jet","#0e7490"],direct:["Direct","#b91c1c"]};
+var AN_VT={worldfuel:["WFS","#1f6feb"],signature:["Sig","#7b3fd6"],atlantic:["Atl","#0a8754"],caa:["CAA","#c2410c"],jetaviation:["Jet","#0e7490"],avfuel:["Avf","#a16207"],direct:["Direct","#b91c1c"]};
 function anVTag(k){if(!k)return"";var t=AN_VT[k];if(!t){var hsh=0;String(k).split("").forEach(function(c){hsh=(hsh*31+c.charCodeAt(0))%360});t=[String(anVName(k)).slice(0,4),"hsl("+hsh+",55%,40%)"]}return '<span class="vtag" style="background:'+t[1]+'" title="'+esc(anVName(k))+' — newest price">'+esc(t[0])+'</span>'}
 function anGeoHtml(G,a){var all=G.geoAll||[],inR=all.filter(function(ic){return a.reg==="all"||anGeo(ic)[1]===a.reg}),cs={};inR.forEach(function(ic){var c=anGeo(ic)[0];cs[c]=(cs[c]||0)+1});var cl=Object.keys(cs).sort(),rc={};all.forEach(function(ic){var r=anGeo(ic)[1];rc[r]=(rc[r]||0)+1});
  return '<div class="row angeo"><div><label>Region</label><select id="anreg"><option value="all">All regions ('+all.length+')</option>'+AN_RG.map(function(r){return rc[r[0]]?'<option value="'+r[0]+'"'+(a.reg===r[0]?' selected':'')+'>'+esc(r[1])+' ('+rc[r[0]]+')</option>':''}).join("")+'</select></div><div><label>Country</label><select id="ancty"><option value="all">All countries</option>'+cl.map(function(c){return '<option value="'+esc(c)+'"'+(a.cty===c?' selected':'')+'>'+esc(c)+' ('+cs[c]+')</option>'}).join("")+'</select></div></div><p class="sm muted angc">Showing '+G.rows.length+' of '+all.length+' airports'+(a.reg!=="all"||a.cty!=="all"?' · <button class="lk" id="angeox">Clear region/country</button>':'')+'</p>'}
