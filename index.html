@@ -326,7 +326,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.03.0718b",APP_BUILT="2026-11-03 07:18";
+var APP_VERSION="2026.11.03.0725",APP_BUILT="2026-11-03 07:25";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -1250,7 +1250,10 @@ function barPinSoon(ms){if(typeof setTimeout!=="function")return;if(BAR_T)clearT
    // non-vendor folders: app/ = min-version.txt, history/ = history/index.json (Analytics), dev/docs/scripts = tooling
 function ghIgnored(f){f=String(f||"").replace(/\/+$/,"");if(!f||/[\/]/.test(f)||/^[._]/.test(f))return true;return /^(overrides|app|history|dev|docs|scripts|tests?|node_modules)$/i.test(f)}   // non-vendor folders: app/ = min-version.txt, history/ = history/index.json (Analytics), dev/docs/scripts = tooling;   // only plain top-level names are vendor sources (never <vendor>/history/)
 /* one-time clean-up of saved state from the overrides era: folder status/errors/toggles, cached rows, queues, leg flags */
-function ovPurge(){var g=S.gh;if(g){if(g.v)Object.keys(g.v).forEach(function(f){if(ghIgnored(f))delete g.v[f]});if(Array.isArray(g.folders))g.folders=g.folders.filter(function(f){return !ghIgnored(f)});if(g.err&&/overrides/i.test(g.err))g.err=null;if(g.msg&&/overrides/i.test(g.msg))g.msg=String(g.msg).split(" · ").filter(function(x){return !/overrides/i.test(x)}).join(" · ");if(g.autoErr&&/overrides/i.test(g.autoErr))g.autoErr=null;["ovRO","ovSaved","ovErr","ovBusy"].forEach(function(k){delete g[k]})}
+/* drop parts of a saved "Some files did not load: a (…); b (…)" message (or a check log) that name a skipped folder — saved state from older builds must not render */
+function ghErrClean(t){if(!t)return t;var m=String(t).match(/^Some files did not load: ([\s\S]*)$/);if(!m)return t;var parts=m[1].split("; ").filter(function(x){return !ghIgnored(x.split(" (")[0])});return parts.length?"Some files did not load: "+parts.join("; "):null}
+function ghMsgClean(t){return t?String(t).split(" · ").filter(function(x){return !ghIgnored(x.split(":")[0])}).join(" · "):t}
+function ovPurge(){var g=S.gh;if(g){g.err=ghErrClean(g.err);g.autoErr=ghErrClean(g.autoErr);g.msg=ghMsgClean(g.msg);if(g.v)Object.keys(g.v).forEach(function(f){if(ghIgnored(f))delete g.v[f]});if(Array.isArray(g.folders))g.folders=g.folders.filter(function(f){return !ghIgnored(f)});if(g.err&&/overrides/i.test(g.err))g.err=null;if(g.msg&&/overrides/i.test(g.msg))g.msg=String(g.msg).split(" · ").filter(function(x){return !/overrides/i.test(x)}).join(" · ");if(g.autoErr&&/overrides/i.test(g.autoErr))g.autoErr=null;["ovRO","ovSaved","ovErr","ovBusy"].forEach(function(k){delete g[k]})}
  ["ovData","ovQ","ovPending"].forEach(function(k){delete S[k]});(S.legs||[]).forEach(function(l){["ovOff","ovSrc","ovr","ovPrice","acMan","acCur"].forEach(function(k){delete l[k]})})}
 function ghCfg(){var g=S.gh=S.gh||{};if(!g.repo)g.repo="adibiase/fuel-prices";if(!g.branch)g.branch="main";g.v=g.v||{};return g}
 function ghOnline(){return !(typeof navigator!=="undefined"&&navigator&&navigator.onLine===false)}
@@ -1331,7 +1334,7 @@ function ghToastHtml(){var g=ghCfg(),t=g.toast;if(!t||ghNow()-t.at>GH_TOAST_MS)r
 function ghAutoHtml(){var g=ghCfg(),m=ghAutoMin(),lu=null;Object.keys(g.v).forEach(function(f){var v=g.v[f];if(v.at&&(!lu||v.at>lu.at))lu={at:v.at,n:v.name||f}});
  var h='<div class="tog"><span>Auto-check for new prices <span class="lsub">while the app is open, and when you come back to it</span></span><select id="ghauto" style="width:auto">'+GH_AUTO_OPTS.map(function(o){return '<option value="'+o+'"'+(o===m?' selected':'')+'>'+(o?'every '+o+' min':'Off')+'</option>'}).join("")+'</select></div>';
  h+='<div class="ghst" id="ghauto-st">Last checked '+(g.lastPoll?ghWhen(g.lastPoll):'never')+(lu?' · last updated '+esc(lu.n)+' '+ghWhen(lu.at):'')+(g.nextAt&&g.nextAt>ghNow()?' · next try '+ghWhen(g.nextAt):'')+'</div>';
- if(g.autoErr)h+='<div class="hint">⚠️ '+esc(g.autoErr)+'</div>';
+ if(ghErrClean(g.autoErr))h+='<div class="hint">⚠️ '+esc(ghErrClean(g.autoErr))+'</div>';
  return h+'<div class="row"><button class="btn" id="ghnow"'+(g.busy||!ghTok()?' disabled':'')+'>'+(g.busy?'⏳ Checking…':'Check now')+'</button></div>'}
 function ghStart(){var tick=function(){ghTick(function(ch){if(ch){render();save()}else{var e=typeof document!=="undefined"&&document.querySelector&&document.querySelector("#ghauto-st");if(e&&ghCfg().lastPoll)save()}})};
  if(typeof setInterval==="function"){var iv=setInterval(tick,60e3);if(iv&&iv.unref)iv.unref()}
@@ -1624,7 +1627,7 @@ function fhLoadRow(r){S.fhEdit={airport:r.airport,fbo:r.fbo,aircraft:r.aircraft,
 function fhDelete(){var ed=S.fhEdit;if(!ed)return;if(!ed.tab){S.fhMsg="Only FBO Handling table rows can be deleted here (this row comes from "+ed.src+").";return}fhQueue([{airport:ed.airport,fbo:ed.fbo,aircraft:ed.aircraft,del:true}]);S.fhMsg="Deleted "+ed.airport+" "+ed.fbo+" ("+ed.aircraft+")";S.fhEdit=null;S.fhForm=null}
 function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from GitHub</b> <span class="lsub">private repo</span>';
  Object.keys(g.v).forEach(function(f){var v=g.v[f];if(v.sha&&v.on)h+='<div class="ghst">✓ Prices from GitHub · '+esc(v.name||f)+' · updated '+ghWhen(v.at)+' · sha '+esc(v.sha.slice(0,7))+(v.checked&&v.checked>v.at?' <span class="lbu">(checked '+ghWhen(v.checked)+')</span>':'')+'</div>'});
- if(g.err)h+='<div class="card warn">⚠️ '+esc(g.err)+'</div>';
+ if(ghErrClean(g.err))h+='<div class="card warn">⚠️ '+esc(ghErrClean(g.err))+'</div>';
  h+=ghAutoHtml();
  h+='<details class="ghadv"><summary class="sm">Advanced (repo, branch)</summary><div class="row"><div><label>Repo (owner/name)</label><input id="ghrepo" value="'+esc(g.repo)+'" autocapitalize="off" autocorrect="off" spellcheck="false"></div><div><label>Branch</label><input id="ghbranch" value="'+esc(g.branch)+'" autocapitalize="off" autocorrect="off" spellcheck="false"></div></div></details>';
  h+='<p class="muted">'+(tok?'Uses the GitHub token you signed in with ('+esc(g.login||'')+'). ':'Not signed in. ')+'<button class="lk" data-goto="acct">Setup › Account</button></p>';
