@@ -48,6 +48,7 @@ input,select{width:100%;min-height:44px;font:inherit;font-size:16px;color:var(--
 .sticky .in{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .big{font-size:22px;font-weight:700;color:var(--ok);font-variant-numeric:tabular-nums}.sm{font-size:12px;color:var(--t2)}
 details summary{min-height:44px;display:flex;align-items:center;font-weight:600;cursor:pointer}
+.sumgrid .bcpg{display:block;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}.sumgrid .bsub{display:block;font-size:11px;color:var(--t2);margin-top:2px;font-variant-numeric:tabular-nums}.sumgrid>div{min-width:0}
 .tg.fxd{background:#5b3fd6;color:#fff}.fxs{font-size:10px;background:#fff;color:#5b3fd6;border-radius:4px;padding:0 4px;margin-left:3px;font-weight:700}.fxw{color:var(--warn)}.fxn{color:#5b3fd6}
 .cpgbig{display:flex;flex-direction:column;align-items:flex-start;margin-bottom:8px}.cpgbig b{font-size:28px;line-height:1.1;color:var(--ok)}.cpgbig b small{font-size:14px;color:inherit;font-weight:600}.prevopt,.endcr{margin:2px 0 8px}.lcpg{font-weight:600}.tdc{white-space:nowrap}
 .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sumgrid div{background:var(--in);border-radius:10px;padding:10px}.sumgrid b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
@@ -324,7 +325,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.02.1833",APP_BUILT="2026-11-02 18:33";
+var APP_VERSION="2026.11.02.1914",APP_BUILT="2026-11-02 19:14";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -463,6 +464,12 @@ function endCredit(){var l=endLeg();if(!l||S.endVal==="off")return{v:0};var to=S
  var p=Math.min.apply(null,ds.map(function(e){return e.o.t[0][1]}));return{v:p>0?p:0,apt:to,dir:true}}
 /* ---- handling strategy per stop (override the optimizer) + waiver-minimum scenario ---- */
 var HS_OPTS=[["auto","Auto (optimize)"],["w","Buy min to waive"],["p","Pay handling fee"]];
+function netOpt(r){return r.obj!=null?r.obj:r.opt}   // net of the end-of-trip fuel credit → Baseline − Optimized = Savings
+function sumBoxes(r){var c=r.cpg!=null,bc=r.baseCpg!=null,cg=function(v){return '<span class="bcpg">'+cpgS(v)+'/gal</span>'};
+ return '<div class="sumgrid"><div><span class="sm">Optimized'+(r.credit>0?' (net of credit)':'')+'</span><b>'+money(netOpt(r))+'</b>'+(c?cg(r.cpg):'')+(r.credit>0?'<span class="bsub">'+money(r.opt)+' spent − '+money(r.credit)+' credit</span>':'')+'</div>'+
+  '<div><span class="sm">Baseline (need-only, all fees)</span><b>'+money(r.baseline)+'</b>'+(bc?cg(r.baseCpg):'')+'</div>'+
+  '<div><span class="sm">Savings</span><b style="color:var(--ok)">'+money(r.savings)+'</b>'+(c&&bc?'<span class="bcpg" style="color:var(--ok)">'+cpgS(r.baseCpg-r.cpg)+'/gal saved</span>':'')+'</div>'+
+  '<div><span class="sm">Savings %</span><b>'+(r.savPct*100).toFixed(1)+'%</b><span class="bsub">of baseline cost</span></div></div>'}
 function crGal(g){return g<10?(Math.round(g*10)/10).toFixed(1):gal(g)}
 function fixUs(){var o={},any=false;S.legs.forEach(function(l,i){if(isFix(l)){o[i]=num(l.fixU);any=true}});return any?o:undefined}
 function isFix(l){return !!l&&!blank(l.fixU)&&isFinite(num(l.fixU))&&num(l.fixU)>=0}
@@ -577,8 +584,8 @@ function costChart(r,cap){var W=340,lh=40,lw=50,top=6,H=top+r.rows.length*lh+16,
   s+='<rect x="'+lw+'" y="'+(y+2)+'" width="'+sx(x.fuel)+'" height="14" style="fill:'+k.c+'"/><rect x="'+(lw+sx(x.fuel))+'" y="'+(y+2)+'" width="'+sx(x.fee)+'" height="14" class="fee"/><text x="'+(lw+sx(x.stop)+4)+'" y="'+(y+13)+'" class="t s">'+money(x.stop).replace(/\.\d\d$/,"")+'</text>';
   s+='<rect x="'+lw+'" y="'+(y+18)+'" width="'+sx(b.f)+'" height="14" class="bl"/><rect x="'+(lw+sx(b.f))+'" y="'+(y+18)+'" width="'+sx(b.fee)+'" height="14" class="fee"/><text x="'+(lw+sx(b.f+b.fee)+4)+'" y="'+(y+29)+'" class="t s">'+money(b.f+b.fee).replace(/\.\d\d$/,"")+'</text>'});
  s+='<text x="'+lw+'" y="'+(H-2)+'" class="t s">top = optimized · bottom (gray) = baseline · red tip = handling fee</text>';
- var pct=r.baseline?Math.max(0,Math.min(1,r.opt/r.baseline)):1;
- return '<div class="card"><b>Cost per stop: optimized vs baseline</b><svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Cost chart">'+s+'</svg><div class="sv"><div class="svo" style="width:'+(pct*100).toFixed(1)+'%">Optimized '+money(r.opt)+'</div><div class="svs">Save '+money(r.savings)+'</div></div><p class="muted">Full bar = baseline '+money(r.baseline)+'</p></div>'}
+ var pct=r.baseline?Math.max(0,Math.min(1,netOpt(r)/r.baseline)):1;
+ return '<div class="card"><b>Cost per stop: optimized vs baseline</b><svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Cost chart">'+s+'</svg><div class="sv"><div class="svo" style="width:'+(pct*100).toFixed(1)+'%">Optimized '+money(netOpt(r))+'</div><div class="svs">Save '+money(r.savings)+'</div></div><p class="muted">Full bar = baseline '+money(r.baseline)+'</p></div>'}
 function shortAc(a){return String(a.name||"").replace(/^(Gulfstream|Dassault|Bombardier|Cessna|Embraer) /,"").replace(/^Falcon /,"Falcon ")}
 function dmy(t){var d=new Date(t),M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return d.getDate()+" "+M[d.getMonth()]+" "+d.getFullYear()}
 function routeStr(){var c=S.legs.map(function(l){return icaoNorm(l.from)||"?"});c.push(icaoNorm(S.legs[S.legs.length-1].to)||"?");return c.join("-")}
@@ -587,7 +594,7 @@ function reportText(r,short){var a=acNow(),L=[],n=function(s){L.push(s)},sg=func
  var tu=r.rows.reduce(function(s,x){return s+x.u},0),tb=(r.baseUplift||[]).reduce(function(s,x){return s+x},0),last=r.rows[r.rows.length-1];
  n("FUEL TANKERING PLAN"+(S.trip?" — "+S.trip:""));n("Route: "+routeStr().replace(/-/g," → "));n("Aircraft: "+a.name);
  n("Start fuel: "+sg(startGal())+"  (density "+dens()+" lb/gal)");n("");
- n("TOTALS");n("Optimized: "+money(r.opt));n("Baseline (need-only, all fees): "+money(r.baseline));n("Savings: "+money(r.savings)+" ("+(r.savPct*100).toFixed(1)+"%)");if(r.cpg!=null)n("Trip average all-in: "+cpgS(r.cpg)+"/gal ("+denTxt(r)+" "+gal(r.den)+" gal)"+(r.credit>0?" incl. end-of-trip fuel credit "+money(r.credit):""));if(r.prev)n("Previous optimizer: "+cpgS(r.prev.cpg)+"/gal, "+money(r.prev.obj));
+ n("TOTALS");n("Optimized: "+money(netOpt(r))+(r.credit>0?" ("+money(r.opt)+" spent − "+money(r.credit)+" end-of-trip credit)":"")+(r.cpg!=null?" · "+cpgS(r.cpg)+"/gal":""));n("Baseline (need-only, all fees): "+money(r.baseline));n("Savings: "+money(r.savings)+" ("+(r.savPct*100).toFixed(1)+"%)");if(r.cpg!=null)n("Trip average all-in: "+cpgS(r.cpg)+"/gal ("+denTxt(r)+" "+gal(r.den)+" gal)"+(r.credit>0?" incl. end-of-trip fuel credit "+money(r.credit):""));if(r.prev)n("Previous optimizer: "+cpgS(r.prev.cpg)+"/gal, "+money(r.prev.obj));
  n("Fuel bought: "+sg(tu)+" (baseline "+sg(tb)+")");n("Fuel at final arrival: "+sg(last.arr));n("");
  var sv=sens(r);n("SHOPPING LIST");r.rows.forEach(function(x,i){var l=r.legs[i],k=cat(x,l,a.cap),s=sv&&sv.by[i];n("• "+(l.from||"?")+": "+k.k+" — "+(x.u>0?"buy "+sg(x.u)+" ("+money(x.stop)+")":"no purchase"));var pl=pbLine(x,l,false);if(pl)n("    "+pl);var sl0=S.legs[i]||{};if(sl0.pb||sl0.hdl)n("    "+hdlRep(sl0));if(sl0.fhCall&&sl0.fhr)n("    HANDLING UNVERIFIED — "+FH_CALL+" (last known "+fhVTxt(sl0.fhr.handling_fee,sl0.fhr.waiver_gal)+")");if(s)n("    "+noteTxt(s))});
  var cl=sensText(sv);if(cl.length){n("");cl.forEach(n)}
@@ -710,7 +717,7 @@ function render(){if(authNeeded()){signinRender();return}if(typeof document!=="u
  r.warn.forEach(function(w){h+='<div class="card warn">⚠️ '+esc(w)+'</div>'});fhCallWarn().forEach(function(w){h+='<div class="card callfbo"><span class="tg call">'+FH_CALL+'</span> '+esc(w)+'</div>'});
  if(!r.n){h+='<div class="card"><p class="muted">Enter starting fuel and at least one leg (flight hours, fuel price, handling fee, waiver gal) to see the recommended uplift.</p></div>'}
  else if(r.infeasible){h+='<div class="card bad"><b>INFEASIBLE</b><br>'+esc(r.reason)+'</div>'}
- else{var sv=sens(r);h+=closeCard(sv)+'<div class="card"><div class="cpgbig"><span class="sm">Trip average all-in</span><b>'+cpgS(r.cpg)+'<small>/gal</small></b><span class="sm">(fuel + handling'+(r.credit>0?' − end-of-trip fuel credit':'')+') ÷ '+gal(r.den)+' gal '+denTxt(r)+(r.baseCpg?' · baseline '+cpgS(r.baseCpg):'')+'</span></div>'+(r.credit>0?'<p class="sm endcr">End-of-trip fuel credit: <b>'+money(r.credit)+'</b> — '+crGal(r.rows[r.rows.length-1].arr-r.legs[r.legs.length-1].res)+' gal above reserve at '+esc(endCredit().apt||"")+' × '+cpgS(r.endCredit)+'/gal (direct base price)</p>':'')+prevCmp(r)+'<div class="sumgrid"><div><span class="sm">Optimized</span><b>'+money(r.opt)+'</b></div><div><span class="sm">Baseline (need-only, all fees)</span><b>'+money(r.baseline)+'</b></div><div><span class="sm">Savings</span><b style="color:var(--ok)">'+money(r.savings)+'</b></div><div><span class="sm">Savings %</span><b>'+(r.savPct*100).toFixed(1)+'%</b></div></div>';
+ else{var sv=sens(r);h+=closeCard(sv)+'<div class="card"><div class="cpgbig"><span class="sm">Trip average all-in</span><b>'+cpgS(r.cpg)+'<small>/gal</small></b><span class="sm">(fuel + handling'+(r.credit>0?' − end-of-trip fuel credit':'')+') ÷ '+gal(r.den)+' gal '+denTxt(r)+(r.baseCpg?' · baseline '+cpgS(r.baseCpg):'')+'</span></div>'+(r.credit>0?'<p class="sm endcr">End-of-trip fuel credit: <b>'+money(r.credit)+'</b> — '+crGal(r.rows[r.rows.length-1].arr-r.legs[r.legs.length-1].res)+' gal above reserve at '+esc(endCredit().apt||"")+' × '+cpgS(r.endCredit)+'/gal (direct base price)</p>':'')+prevCmp(r)+''+sumBoxes(r)+'';
   var tu=r.rows.reduce(function(s,x){return s+x.u},0),tb=(r.baseUplift||[]).reduce(function(s,x){return s+x},0);h+='<p class="muted">Fuel bought: optimized '+fqT(tu)+' · baseline '+fqT(tb)+'</p>';
   h+='<p class="muted">Alt. baseline (fees waived where need ≥ waiver): '+money(r.alt)+' → savings '+money(r.altSavings)+'. '+optTxt(r)+(r.depReq[0]>a.cap?' Backward pass: cannot tanker to end of trip – buy en route.':'')+'</p></div>';
   h+=hsResetCard()+(DESK()?shop(r,a.cap)+'<div class="ch2">'+upChart(r,a.cap)+costChart(r,a.cap)+'</div>'+fobChart(r,a.cap,700):shop(r,a.cap)+upChart(r,a.cap)+fobChart(r,a.cap)+costChart(r,a.cap))+wvHtml(r);
@@ -739,7 +746,7 @@ function render(){if(authNeeded()){signinRender();return}if(typeof document!=="u
  if(fp){var ne=$('[data-p="'+fp+'"]');if(ne&&ne.focus){ne.focus();try{if(ss&&ss[0]!=null)ne.setSelectionRange(ss[0],ss[1])}catch(x){}}}
  bar(r)}
 function signinRender(){if(typeof document!=="undefined"&&document.body&&document.body.classList)document.body.classList.add("gate");$("#app").innerHTML=signinHtml();var b=$("#bar");if(b)b.innerHTML=""}
-function bar(r){$("#bar").innerHTML='<button class="barbtn" id="barjump" aria-label="Jump to results">'+(!r.n?'<span class="sm">Enter a leg to see savings</span>':r.infeasible?'<b style="color:var(--bad)">INFEASIBLE</b><span class="sm">'+esc(r.reason)+'</span>':'<div><div class="sm">Savings vs baseline</div><div class="big">'+money(r.savings)+' <span style="font-size:14px">('+(r.savPct*100).toFixed(1)+'%)</span></div></div><div style="text-align:right"><div class="sm">Optimized '+money(r.opt)+'</div><div class="sm">Baseline '+money(r.baseline)+'</div></div>')+'</button>'}
+function bar(r){$("#bar").innerHTML='<button class="barbtn" id="barjump" aria-label="Jump to results">'+(!r.n?'<span class="sm">Enter a leg to see savings</span>':r.infeasible?'<b style="color:var(--bad)">INFEASIBLE</b><span class="sm">'+esc(r.reason)+'</span>':'<div><div class="sm">Savings vs baseline</div><div class="big">'+money(r.savings)+' <span style="font-size:14px">('+(r.savPct*100).toFixed(1)+'%)</span></div></div><div style="text-align:right"><div class="sm">Optimized '+money(netOpt(r))+'</div><div class="sm">Baseline '+money(r.baseline)+'</div></div>')+'</button>'}
 function legInput(p){var m=p.match(/^legs\.(\d+)\.(from|to|wind|hours|trip|reserveLb|waiver)$/);if(!m)return;var i=+m[1],l=S.legs[i],f=m[2],el;l._i=i;
  if(f==="wind"){l.windManual=!blank(l.wind);if(!l.windManual)l.windF=null;el=document.querySelector("#wh"+i);if(el)el.innerHTML=windHint(l)}
  if(f==="from"){l.pbExplicit=false;if(l.pb&&(l.pb.auto||!(PB.idx[l.from]||[]).some(function(x){return pbKey(x)===l.pb.k})))pbPick(i,"manual");pbAuto(l,i)}
