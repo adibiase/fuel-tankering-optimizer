@@ -325,7 +325,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.02.1914",APP_BUILT="2026-11-02 19:14";
+var APP_VERSION="2026.11.02.2005",APP_BUILT="2026-11-02 20:05";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -764,14 +764,8 @@ document.addEventListener("change",function(e){if(anOnChange(e.target))return;va
  if(p){var mm=p.match(/^legs\.(\d+)\.(from|to)$/);if(mm){var lg=S.legs[+mm[1]];lg[mm[2]+"T"]=icaoNorm(t.value);lg[mm[2]]=aptIcao(t.value)}else setPath(p,t.tagName==="SELECT"?+t.value:t.value);var fm=p.match(/^legs\.(\d+)\.(fee|waiver)$/);if(fm){fhLegTyped(+fm[1]);fhLegAsk(+fm[1])}}else if(t.id==="cz")S.chargeZero=t.checked;else if(t.id==="endval")S.endVal=t.value==="off"?"off":"direct";else if(t.id==="optobj")S.optObj=t.value==="burn"?"burn":"base";else if(t.id==="tokexp"){var ar=authRec();if(ar){var ev=Date.parse(String(t.value||"")+"T23:59:00");ar.exp=isFinite(ev)?ev:null;ar.expMan=!!ar.exp;authSetRec(ar)}}
  else if(t.hasAttribute&&t.hasAttribute("data-pb")){var ip=+t.getAttribute("data-pb");pbPick(ip,t.value);if(S.legs[ip])S.legs[ip].pbExplicit=true}
  else if(t.hasAttribute&&t.hasAttribute("data-fhf")){(S.fhF=S.fhF||{})[t.getAttribute("data-fhf")]=t.value}
- else if(t.id==="fhsigfile"){var sf=t.files&&t.files[0];if(!sf)return;var sr=new FileReader();sr.onload=function(){fileRows(sf.name,sr.result).then(function(rows){var P=HDL_BUILTIN[0];if(!rows.length||hdlDetect(rows)!==P){FH_SIG=null;S.fhMsg="";S.fhSigErr="That file is not a Signature handling report (needs columns iata, Base, AC Type, Minimum to Waive, Handling Charge).";render();return}S.fhSigErr="";fhSigStart(hdlBuild(rows,P).apts,sf.name);render()},function(er){S.fhSigErr="Could not read the file: "+(er.message||er);render()})};sr.readAsArrayBuffer(sf);t.value="";return}
- else if(t.id==="fhsigdate"&&FH_SIG&&t.value){FH_SIG=(function(o){var n=fhSigDiff(o.apts,t.value,o.name,{flag:o.flag,sp:o.sp});n.rm=o.rm;return n})(FH_SIG);render();return}
  else if(t.getAttribute&&t.getAttribute("data-dupkeep")&&FH_DUP){var dk=t.getAttribute("data-dupkeep").split(":");FH_DUP.groups[+dk[0]].keep=+dk[1];FH_DUP.confirm=false;render();return}
  else if(t.getAttribute&&t.getAttribute("data-dupon")&&FH_DUP){FH_DUP.groups[+t.getAttribute("data-dupon")].on=!!t.checked;FH_DUP.confirm=false;render();return}
- else if(t.id==="fhsigrm"&&FH_SIG){FH_SIG.rm=!!t.checked;render();return}
- else if(t.id==="fhsigfl"&&FH_SIG){FH_SIG.flag=!!t.checked;render();return}
- else if(t.id==="fhsigsp"&&FH_SIG){FH_SIG.sp=!!t.checked;render();return}
- else if(t.id==="fhfile"){var ff=t.files&&t.files[0];if(!ff)return;var rf=new FileReader();rf.onload=function(){fileRows(ff.name,rf.result).then(function(rows){S.fhPend=fhDiff(rows);S.fhMsg="";render();save()},function(er){S.fhMsg="Could not read the file: "+(er.message||er);render()})};rf.readAsArrayBuffer(ff);t.value="";return}
  else if(t.id==="useadd")S.useAdd=t.checked;
  else if(t.id==="autodir")S.autoDirect=t.checked;
  else if(t.hasAttribute&&t.hasAttribute("data-hb")){var lb=S.legs[+t.getAttribute("data-hb")];if(lb&&lb.pb&&t.value)hdlCfg().base[lb.from+"|"+lb.pb.f]=t.value}
@@ -807,12 +801,6 @@ document.addEventListener("click",function(e){if(anOnClick(e.target))return;var 
  if(t.id==="fhsave"){fhSubmit();render();save();return}
  if(t.id==="fhdel"){var ed=S.fhEdit;if(ed){var k0=fhKey(ed),o0=ed.tab&&fhData().rows.filter(function(o){return fhKey(o)===k0})[0],lb=ed.airport+" "+ed.fbo+" ("+ed.aircraft+")";fhDelete();if(o0){o0=Object.assign({},o0,{keepStamp:true});undoSet("Deleted "+lb,function(){fhQueue([o0]);S.fhMsg="Restored "+lb})}}render();save();return}
  if(t.id==="fhclr"){S.fhForm=null;S.fhEdit=null;S.fhErr={};S.fhMsg="";render();save();return}
- if(t.id==="fhtpl"){fhDl("fbo_handling_template.csv",FH_TEMPLATE);return}
- if(t.id==="fhexp"){fhDl("fbo_handling_export.csv",fhExportCsv());return}
- if(t.id==="fhsigimp"){var si=$("#fhsigfile");if(si)si.click();return}
- if(t.id==="fhsigmig"){var hs=HS.list.filter(function(x){return x.prof==="signature"})[0];if(hs){S.fhSigErr="";fhSigStart(hs.apts,"Current signature-handling file (one-time migration)")}render();return}
- if(t.id==="fhsigok"){fhSigApply();render();save();return}
- if(t.id==="fhsigx"){FH_SIG=null;render();return}
  if(t.id==="fhdup"){fhDupOpen();render();return}
  if(t.id==="fhdupx"){FH_DUP=null;render();return}
  if(t.id==="fhdupdel"&&FH_DUP){FH_DUP.confirm=true;render();return}
@@ -821,9 +809,6 @@ document.addEventListener("click",function(e){if(anOnClick(e.target))return;var 
  if(t.id==="fhfclr"){S.fhF={q:"",ac:"",src:"",st:""};render();save();return}
  if(t.id==="fhreload"){var gv0=ghCfg().v["fbo-handling"]=ghCfg().v["fbo-handling"]||{on:true};gv0.on=true;fhData().rows=fhData().rows||[];delete gv0.sha;gv0.err=null;ghCfg().etag=null;if(ghTok())ghPoll(true,function(){render();save()});render();return}
  if(t.id==="stalerel"){try{location.reload()}catch(x){}return}
- if(t.id==="fhimp"){var fi=$("#fhfile");if(fi)fi.click();return}
- if(t.id==="fhimpok"){fhImportOk();render();save();return}
- if(t.id==="fhimpx"){S.fhPend=null;render();save();return}
  if(t.hasAttribute("data-ac"))S.ac=+t.getAttribute("data-ac");
  else if((d=t.getAttribute("data-del"))!=null)S.legs.splice(+d,1);
  else if((d=t.getAttribute("data-hs"))!=null){var hp=d.split("|"),hl=S.legs[+hp[0]];if(!hl)return;if(hp[1]==="w"||hp[1]==="p")hl.hs=hp[1];else delete hl.hs}
@@ -1574,6 +1559,7 @@ function fhDupScan(){var pool=[],sig={},add=function(o,where){var k=fhNormKey(o)
  Object.keys(near).sort().forEach(function(nk){var ks=near[nk];if(ks.length>1)groups.push({kind:"near",key:nk,rows:ks.map(function(k){return by[k].slice().sort(function(a,b){return fhKeepCmp(a.o,b.o)})[0]})})});
  groups.forEach(function(g){g.rows.sort(function(a,b){return fhKeepCmp(a.o,b.o)});g.keep=0;g.on=g.kind==="exact"});
  return{groups:groups,checked:pool.length,rows:Math.max(fhData().rows.length,(FH_REMOTE||[]).length)}}
+function fhDupWarn(){var c=fhDupCount();if(!c&&!FH_DUP)return"";return '<div class="card'+(c?' warn':'')+'">'+(c?'⚠️ <b>'+c+' duplicate row'+(c>1?'s':'')+'</b> in the FBO Handling table (same airport, FBO, aircraft, fee and waiver). ':'')+'<button class="btn" id="fhdup">Review duplicates'+(c?' <span class="badge bad">'+c+'</span>':'')+'</button>'+fhDupHtml()+'</div>'}
 function fhDupCount(){try{return fhDupScan().groups.filter(function(g){return g.kind==="exact"}).reduce(function(n,g){return n+g.rows.length-1},0)}catch(x){return 0}}
 function fhDupN(){var D=FH_DUP;if(!D)return 0;return D.groups.filter(function(g){return g.on}).reduce(function(n,g){return n+g.rows.length-1},0)}
 function fhDupOpen(){FH_DUP=fhDupScan();FH_DUP.confirm=false;FH_DUP.done=null}
@@ -1624,8 +1610,8 @@ function fhPageHtml(){var f=fhForm(),E=S.fhErr||{},g=ghCfg(),ic=f.apt?aptIcao(f.
  h+='<div class="row"><button class="btn pri" id="fhsave"'+(ghTok()?'':' title="Saved on this device; add a GitHub token in Setup › Contract prices to share"')+'>'+(S.fhEdit?'Save changes':'Add')+'</button>'+(S.fhEdit?'<button class="btn del" id="fhdel">Delete</button>':'<button class="btn" id="fhclr">Clear</button>')+'</div>'+(S.fhEdit?'<button class="lk" id="fhclr">Cancel edit</button>':'');
  if(S.fhMsg)h+='<p class="sm" style="color:var(--ok)">✓ '+esc(S.fhMsg)+'</p>';
  h+='<p class="muted">'+(!ghTok()?'Saved on this device only — <button class="lk" data-goto="gh">add a GitHub token in Setup</button> to share. ':'')+(g.fhRO?'<button class="lk" data-goto="gh">Setup › GitHub token</button> ':'')+(g.fhErr?'⚠️ '+esc(g.fhErr):q?q+' change(s) waiting to be saved to GitHub':g.fhSaved?'Last saved '+ghWhen(g.fhSaved.at):'')+'</p></div>';
- h+='<div class="card"><div class="row"><button class="btn" id="fhtpl">Download template</button><button class="btn" id="fhimp">Import CSV</button><button class="btn" id="fhexp">Export CSV</button><button class="btn" id="fhdup">Review duplicates'+(function(){var c=fhDupCount();return c?' <span class="badge bad">'+c+'</span>':''})()+'</button></div>'+fhDupHtml()+'<input type="file" id="fhfile" accept=".csv,text/csv" style="display:none">'+fhPendHtml()+'<div class="row"><button class="btn pri" id="fhsigimp">Import Signature monthly CSV</button>'+(HS.list.some(function(x){return x.prof==="signature"})&&!fhData().rows.some(function(o){return fhSrcOf(o)==="Signature schedule"&&/^Signature base /.test(o.note||"")})?'<button class="btn" id="fhsigmig">Migrate current Signature file (one time)</button>':'')+'</div><input type="file" id="fhsigfile" accept=".csv,.xlsx,.xls,text/csv" style="display:none">'+(S.fhSigErr?'<p class="sm" style="color:var(--bad)">⚠️ '+esc(S.fhSigErr)+'</p>':'')+fhSigHtml()+'<p class="muted">Template columns: airport, fbo, aircraft (G650ER / Falcon 2000LXS / Both — aliases G650, GLF6, SJ, F2TH, HJ… accepted), handling_fee, waiver_gal (blank = no waiver), effective_date, note. The overrides master format is accepted too.</p></div>';
- h+='<div class="card"><b>Available handling data</b><div class="row3 fhf"><div><label>Filter</label><input data-p="fhF.q" value="'+esc(F.q)+'" placeholder="airport, FBO or city" autocapitalize="off"></div><div><label>Aircraft</label><select data-fhf="ac"><option value="">All</option>'+FH_ACS.map(function(a){return '<option'+(F.ac===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div><div><label>Source</label><select data-fhf="src"><option value="">All</option>'+FH_SRCS.map(function(a){return '<option'+(F.src===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div><div><label>Status</label><select data-fhf="st"><option value="">All</option><option value="call"'+(F.st==="call"?' selected':'')+'>'+FH_CALL+' ('+fhData().rows.filter(fhCall).length+')</option><option value="ok"'+(F.st==="ok"?' selected':'')+'>Verified</option></select></div></div><div id="fhtab">'+fhTableHtml()+'</div><p class="muted">Tap a row to load it into the form. This table is the primary source of handling fee and waiver gallons for every leg (per aircraft). Typing a fee or waiver on a leg card updates this table automatically. Each month: Import Signature monthly CSV → review the diff → Apply. Rows from the raw Signature file (suggestion) are only offered on a leg with no table entry. Direct fuel at KLBX, KMBS and KBTR is treated as no handling fee.</p></div>';
+ h+=fhDupWarn();   // import/export buttons removed: handling data arrives by the automated Signature email import; duplicates still surface here
+ h+='<div class="card"><b>Available handling data</b><div class="row3 fhf"><div><label>Filter</label><input data-p="fhF.q" value="'+esc(F.q)+'" placeholder="airport, FBO or city" autocapitalize="off"></div><div><label>Aircraft</label><select data-fhf="ac"><option value="">All</option>'+FH_ACS.map(function(a){return '<option'+(F.ac===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div><div><label>Source</label><select data-fhf="src"><option value="">All</option>'+FH_SRCS.map(function(a){return '<option'+(F.src===a?' selected':'')+'>'+a+'</option>'}).join("")+'</select></div><div><label>Status</label><select data-fhf="st"><option value="">All</option><option value="call"'+(F.st==="call"?' selected':'')+'>'+FH_CALL+' ('+fhData().rows.filter(fhCall).length+')</option><option value="ok"'+(F.st==="ok"?' selected':'')+'>Verified</option></select></div></div><div id="fhtab">'+fhTableHtml()+'</div><p class="muted">Tap a row to load it into the form. This table is the primary source of handling fee and waiver gallons for every leg (per aircraft). Typing a fee or waiver on a leg card updates this table automatically. Signature handling reports arrive by the automated email import (checked hourly) and merge into this table. Rows from the raw Signature file (suggestion) are only offered on a leg with no table entry. Direct fuel at KLBX, KMBS and KBTR is treated as no handling fee.</p></div>';
  return h}
 function goSetup(w){S.page='setup';if(w==='pb')S.pbOpen=true;render();save();var e=((w==='gh'||w==='acct')&&$('#ghtok'))||$('#sec-'+(w==='gh'?'acct':w));if(e&&e.scrollIntoView)e.scrollIntoView({block:'start'});else window.scrollTo(0,0)}
 function navHtml(){var p=S.page||"plan";return '<div class="seg nav">'+[["plan","Planner"],["fbo","FBO Handling"],["an","Analytics"],["setup","Setup"]].map(function(x){return '<button data-page="'+x[0]+'" class="'+(p===x[0]?"on":"")+'">'+x[1]+'</button>'}).join("")+'</div>'}
