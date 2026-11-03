@@ -326,7 +326,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.02.2036b",APP_BUILT="2026-11-02 20:36";
+var APP_VERSION="2026.11.02.2055",APP_BUILT="2026-11-02 20:55";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
 legs:[newLeg()]};
@@ -1334,7 +1334,7 @@ function ghAutoHtml(){var g=ghCfg(),m=ghAutoMin(),lu=null;Object.keys(g.v).forEa
  return h+'<div class="row"><button class="btn" id="ghnow"'+(g.busy||!ghTok()?' disabled':'')+'>'+(g.busy?'⏳ Checking…':'Check now')+'</button></div>'}
 function ghStart(){var tick=function(){ghTick(function(ch){if(ch){render();save()}else{var e=typeof document!=="undefined"&&document.querySelector&&document.querySelector("#ghauto-st");if(e&&ghCfg().lastPoll)save()}})};
  if(typeof setInterval==="function"){var iv=setInterval(tick,60e3);if(iv&&iv.unref)iv.unref()}
- if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!ghHidden()){tick();updCheck()}});
+ if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!ghHidden()){tick();updCheck();anStaleCheck()}});
  if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("focus",tick);
  if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("online",tick)}
 /* ---- shared GitHub write helpers (used by the FBO Handling table) ---- */
@@ -1634,7 +1634,7 @@ function ghHtml(){var g=ghCfg(),tok=ghTok(),h='<div class="ghs"><b>Load from Git
 /* ---- Analytics: week-to-week $/gal heat grid from the private repo's weekly history (history/index.json + <vendor>/history/<date>.csv) ----
    Loaded lazily when the Analytics tab opens; each history file is parsed with the same pbDetect/pbBuild pipeline as latest.csv,
    reduced to per-airport tier ladders and cached on this device (IndexedDB, kind "history") for offline use. */
-var AN={files:{},idx:null,busy:false,started:false,err:null,note:null,sel:null,at:0},AN_MAXW=26,AN_IDX="history/index.json",AN_MON=60,AN_CONC=6,AN_MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var AN={files:{},idx:null,busy:false,started:false,err:null,note:null,sel:null,at:0},AN_MAXW=26,AN_IDX="history/index.json",AN_MON=60,AN_CONC=6,AN_STALE=10*60e3,AN_MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 var AN_VN={worldfuel:"World Fuel",atlantic:"Atlantic Aviation",direct:"Direct",caa:"CAA",signature:"Signature",jetaviation:"Jet Aviation"};
 function anCfg(){var a=S.an=S.an||{};if(!a.v)a.v="all";if(!a.basis)a.basis="first";if(!(+a.up>0))a.up=1000;if(!a.scale)a.scale="row";if(a.q==null)a.q="";if(!a.sort)a.sort="apt";if(a.rng!=="52"&&a.rng!=="all")a.rng="26";return a}
 function anVName(k){return AN_VN[k]||String(k||"").replace(/^./,function(c){return c.toUpperCase()})}
@@ -1673,7 +1673,7 @@ function anAgg(G,a,keys){if(!G)return G;var ms=keys;if(!ms){var o={};G.weeks.for
  var all=[];rows.forEach(function(r){ms.forEach(function(m){if(r.c[m])all.push(r.c[m].p)})});all.sort(function(x,y){return x-y});var pc=function(f){return all.length?all[Math.min(all.length-1,Math.max(0,Math.round(f*(all.length-1))))]:0};
  return{weeks:ms,rows:rows,gmin:pc(0.05),gmax:pc(0.95),n:all.length,mon:true,nw:G.weeks.length}}
 function anMaybeAgg(G,a){return G&&G.weeks.length>AN_MON?anAgg(G,a):G}
-function anColLab(G,w){if(G&&G.mon){var m=+w.slice(5,7);return AN_MN[m-1]+(m===1||w===G.weeks[0]?"<br>"+w.slice(0,4):"")}return pbDTxt(w,1)}
+function anColLab(G,w,first){if(G&&G.mon){var m=+w.slice(5,7);return AN_MN[m-1]+(first||m===12?"<br>"+w.slice(0,4):"")}return pbDTxt(w,1)}
 function anWhen(G,w){return G&&G.mon?AN_MN[+String(w).slice(5,7)-1]+" "+String(w).slice(0,4):"week of "+pbDTxt(w)}
 function anPrevLab(G,w,pw){if(G&&G.mon){var d=new Date(w+"T00:00:00Z");d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,10)===pw?"prior month":anWhen(G,pw)}return pw===anAddW(w,-1)?"prior week":"week of "+pbDTxt(pw)}
 function anFrac(r,w,G,a){var c=r.c[w];if(!c)return null;var lo,hi;if((a||anCfg()).scale==="row"){if(r._rgG!==G){var v=[];G.weeks.forEach(function(x){var y=r.c[x];if(y)v.push(y.p)});v.sort(function(x,y){return x-y});var q=function(f){return v[Math.min(v.length-1,Math.max(0,Math.round(f*(v.length-1))))]};r._rg=v.length>=20?[q(0.05),q(0.95)]:[v[0],v[v.length-1]];r._rgG=G}lo=r._rg[0];hi=r._rg[1]}else{lo=G.gmin;hi=G.gmax}
@@ -1696,13 +1696,17 @@ function anDirGrids(a){a=a||anCfg();var L=anDirList(),isD=function(v){return v==
  D.rows.sort(function(x,y){return L.indexOf(x.a)-L.indexOf(y.a)});return{D:D,A:A,L:L}}
 function anAltTxt(AG,ic,w,c){var r=AG.rows.filter(function(x){return x.a===ic})[0],k=r&&r.c[w];if(!k)return '<div class="sm muted">No other vendor prices '+esc(ic)+' this week.</div>';
  return '<div class="sm">Cheapest other vendor: <b>$'+pbP4(k.p)+'</b> · '+esc(anVName(k.v))+(c?' · direct is <b style="color:var('+(c.p<=k.p?'--ok':'--bad')+')">'+anDelta(c.p-k.p)+'</b> vs it':'')+'</div>'}
-function anTable(G,a,pre,AG){var h='<div class="anw"><table class="ang'+(G.mon?' anmon':G.weeks.length>30?' anlong':'')+'"><thead><tr><th class="anst">Airport</th>'+G.weeks.map(function(w){return '<th>'+anColLab(G,w)+'</th>'}).join("")+'<th>'+(G.mon?'Δ mo':'Δ wk')+'</th></tr></thead><tbody>';
- G.rows.forEach(function(r){h+='<tr><th class="anst" scope="row">'+esc(r.a)+'</th>'+G.weeks.map(function(w){var c=r.c[w],k=pre+"|"+r.a+"|"+w;return c?'<td data-anc="'+esc(k)+'" title="'+esc(anTip(r,G,w))+'" style="background:'+anColor(anFrac(r,w,G,a))+'"'+(AN.sel===k?' class="on"':'')+'>'+c.p.toFixed(2)+'</td>':'<td class="anna" title="'+esc(anTip(r,G,w))+'"></td>'}).join("")+'<td class="anchg">'+(r.chg==null?'—':'<span style="color:var('+(r.chg>0?'--bad':r.chg<0?'--ok':'--t2')+')">'+anDelta(r.chg)+'</span>')+'</td></tr>';
+/* newest first: Airport (sticky) · Δ · newest week/month · … · oldest — latest price and its change visible without scrolling */
+function anTable(G,a,pre,AG){var C=G.weeks.slice().reverse(),dl=G.mon?'Δ mo':'Δ wk',h='<div class="anw"><table class="ang'+(G.mon?' anmon':G.weeks.length>30?' anlong':'')+'"><thead><tr><th class="anst">Airport</th><th class="anchg">'+dl+'</th>'+C.map(function(w,i){return '<th>'+anColLab(G,w,i===0)+'</th>'}).join("")+'</tr></thead><tbody>';
+ G.rows.forEach(function(r){h+='<tr><th class="anst" scope="row">'+esc(r.a)+'</th><td class="anchg">'+(r.chg==null?'—':'<span style="color:var('+(r.chg>0?'--bad':r.chg<0?'--ok':'--t2')+')">'+anDelta(r.chg)+'</span>')+'</td>'+C.map(function(w){var c=r.c[w],k=pre+"|"+r.a+"|"+w;return c?'<td data-anc="'+esc(k)+'" title="'+esc(anTip(r,G,w))+'" style="background:'+anColor(anFrac(r,w,G,a))+'"'+(AN.sel===k?' class="on"':'')+'>'+c.p.toFixed(2)+'</td>':'<td class="anna" title="'+esc(anTip(r,G,w))+'"></td>'}).join("")+'</tr>';
   var ar=AG&&AG.rows.filter(function(x){return x.a===r.a})[0];
-  if(ar){var lw=G.weeks.filter(function(w){return r.c[w]&&ar.c[w]}).pop();h+='<tr class="analt"><th class="anst" scope="row">↳ other</th>'+G.weeks.map(function(w){var k=ar.c[w];return '<td title="'+esc(k?r.a+" · "+anWhen(G,w)+": cheapest other vendor $"+pbP4(k.p)+(G.mon?" (avg)":"")+" · "+anVName(k.v):r.a+" · "+anWhen(G,w)+": no other vendor")+'">'+(k?k.p.toFixed(2):'')+'</td>'}).join("")+'<td class="anchg" title="Direct minus cheapest other vendor, latest '+(G.mon?'month':'week')+' with both">'+(lw?'<span class="sm">vs direct </span><span style="color:var('+(r.c[lw].p<=ar.c[lw].p?'--ok':'--bad')+')">'+anDelta(r.c[lw].p-ar.c[lw].p)+'</span>':'—')+'</td></tr>'}});
+  if(ar){var lw=G.weeks.filter(function(w){return r.c[w]&&ar.c[w]}).pop();h+='<tr class="analt"><th class="anst" scope="row">↳ other</th><td class="anchg" title="Direct minus cheapest other vendor, latest '+(G.mon?'month':'week')+' with both">'+(lw?'<span class="sm">vs direct </span><span style="color:var('+(r.c[lw].p<=ar.c[lw].p?'--ok':'--bad')+')">'+anDelta(r.c[lw].p-ar.c[lw].p)+'</span>':'—')+'</td>'+C.map(function(w){var k=ar.c[w];return '<td title="'+esc(k?r.a+" · "+anWhen(G,w)+": cheapest other vendor $"+pbP4(k.p)+(G.mon?" (avg)":"")+" · "+anVName(k.v):r.a+" · "+anWhen(G,w)+": no other vendor")+'">'+(k?k.p.toFixed(2):'')+'</td>'}).join("")+'</tr>'}});
  return h+'</tbody></table></div>'}
 function anLegend(G){return '<p class="sm">'+gal(G.rows.length)+' airport'+(G.rows.length===1?'':'s')+' · '+(G.mon?G.weeks.length+' months (monthly averages of '+G.nw+' weeks)':G.weeks.length+' week'+(G.weeks.length===1?'':'s'))+' <span class="anleg"><i style="background:'+anColor(0)+'"></i>cheap <i style="background:'+anColor(.5)+'"></i> <i style="background:'+anColor(1)+'"></i>expensive <i class="anna"></i>no data</span></p>'}
-function anPageHtml(){var a=anCfg();if(!AN.started&&typeof setTimeout==="function"){AN.started=true;var t0=setTimeout(function(){anLoad(function(){render()})},0);if(t0&&t0.unref)t0.unref()}
+/* history index is re-read whenever Analytics is shown and the last check is older than AN_STALE (was: once per app session → a long-lived home-screen app never saw files committed after its first open) */
+function anStale(){return !AN.at||Date.now()-AN.at>AN_STALE}
+function anStaleCheck(){if(typeof S!=="undefined"&&S.page==="an"&&!AN.busy&&AN.started&&anStale())anLoad(function(){render()})}
+function anPageHtml(){var a=anCfg();if(!AN.busy&&anStale()&&!AN.queued&&typeof setTimeout==="function"){AN.started=true;AN.queued=true;var t0=setTimeout(function(){AN.queued=false;anLoad(function(){render()})},0);if(t0&&t0.unref)t0.unref()}
  var L=anDirList(),G=anMaybeAgg(anGrid(a,{exc:L}),a),DG=anDirGrids(a),vs=anVendors(),h='<h2>Analytics</h2><p class="muted">Cost per gallon by airport, week by week (weeks start Monday, Central time)'+(anRng(a)?'':'; past 60 weeks each column is a monthly average')+'. Green = cheaper, red = more expensive.'+(a.basis==="up"?' Price at '+gal(a.up)+' gal using each tier ladder.':' First-tier (posted) price.')+'</p>';
  h+='<div class="card anc"><div class="row"><div><label>Range</label><select id="anrng"><option value="26"'+(a.rng==="26"?' selected':'')+'>26 weeks</option><option value="52"'+(a.rng==="52"?' selected':'')+'>1 year</option><option value="all"'+(a.rng==="all"?' selected':'')+'>All history</option></select></div><div><label>Vendor</label><select id="anv"><option value="all"'+(a.v==="all"?' selected':'')+'>All (cheapest)</option>'+vs.map(function(v){return '<option value="'+esc(v)+'"'+(a.v===v?' selected':'')+'>'+esc(anVName(v))+'</option>'}).join("")+'</select></div>'+
   '<div><label>Price basis</label><select id="anbasis"><option value="first"'+(a.basis!=="up"?' selected':'')+'>First tier (posted)</option><option value="up"'+(a.basis==="up"?' selected':'')+'>At an uplift…</option></select></div>'+
@@ -1711,7 +1715,7 @@ function anPageHtml(){var a=anCfg();if(!AN.started&&typeof setTimeout==="functio
   '<div><label>Sort</label><select id="ansort"><option value="apt"'+(a.sort==="apt"?' selected':'')+'>Airport</option><option value="latest"'+(a.sort==="latest"?' selected':'')+'>Latest price</option><option value="chg"'+(a.sort==="chg"?' selected':'')+'>Biggest change</option></select></div></div>'+
   '<div class="row"><div><label>Find airport</label><input id="anq" value="'+esc(a.q)+'" placeholder="e.g. KTEB" autocapitalize="characters" autocomplete="off"></div></div>'+
   '<div class="tog"><span>Only airports on this trip’s legs <span class="lsub">network grid</span></span><label class="sw"><input type="checkbox" id="antrip"'+(a.trip?' checked':'')+'><span></span></label></div></div>';
- if(AN.busy)h+='<p class="muted">⏳ Loading price history…'+(AN.prog&&AN.prog.t?' '+AN.prog.n+' / '+AN.prog.t+' files':'')+'</p>';if(AN.err)h+='<div class="card warn">⚠️ '+esc(AN.err)+'</div>';
+ if(!AN.busy&&AN.at)h+='<p class="sm muted">History checked '+ghWhen(AN.at)+' · <button class="lk" id="anref">↻ Refresh history</button></p>';if(AN.busy)h+='<p class="muted">⏳ Loading price history…'+(AN.prog&&AN.prog.t?' '+AN.prog.n+' / '+AN.prog.t+' files':'')+'</p>';if(AN.err)h+='<div class="card warn">⚠️ '+esc(AN.err)+'</div>';
  var nh=Object.keys(AN.files).length;if(!AN.busy&&!nh)h+='<div class="card anote">ℹ️ No price history yet — showing just the latest week. History builds up weekly as new vendor files arrive.</div>';else if(AN.note)h+='<p class="muted">'+esc(AN.note)+'</p>';
  /* Direct locations: own section, own colour scale (direct airports vs each other and over time), always shown (trip/search filters don't apply) */
  h+='<div id="sec-andir"><h2>Direct locations <span class="cnt">'+esc(L.map(function(c){return c.replace(/^K/,"")}).join(" · "))+'</span></h2><p class="muted">Our direct contract price'+(a.v==="direct"?'':' with the cheapest other vendor underneath (↳ other)')+'. Coloured against these airports only. <button class="lk" data-goto="set">Edit list</button></p>';
@@ -1727,7 +1731,7 @@ function anPageHtml(){var a=anCfg();if(!AN.started&&typeof setTimeout==="functio
 function anCachePut(f){pbDb(function(db){if(!db)return;try{db.transaction("vendors","readwrite").objectStore("vendors").put({id:"hist|"+f.path,kind:"history",path:f.path,vendor:f.vendor,date:f.date,rows:f.rows,ap:f.ap})}catch(e){}})}
 function anCacheLoad(cb){pbDb(function(db){if(!db){cb();return}try{var cur=db.transaction("vendors","readonly").objectStore("vendors").openCursor();cur.onsuccess=function(){var c=cur.result;if(c){var v=c.value;if(v&&v.kind==="history"&&!AN.files[v.path])AN.files[v.path]=v;c.continue()}else cb()};cur.onerror=function(){cb()}}catch(e){cb()}})}
 function anIdxParse(d){try{var j=typeof d==="string"?JSON.parse(d):d;if(j&&!Array.isArray(j)&&d&&d.byteLength!=null)j=JSON.parse(new TextDecoder().decode(d));return j&&Array.isArray(j.files)?j.files.filter(function(f){return f&&f.path&&f.vendor&&/^\d{4}-\d{2}-\d{2}$/.test(f.date||"")}):null}catch(e){return null}}
-function anCutDate(L,a){var n=anRng(a);if(!n||!L.length)return null;var mx=L.reduce(function(m,f){return f.date>m?f.date:m},"");return anAddW(anMon(mx),-(n+1))}
+function anCutDate(L,a){var n=anRng(a);if(!n||!L.length)return null;var td=pbToday(),mx=L.reduce(function(m,f){return f.date>m&&f.date<=td?f.date:m},"")||td;return anAddW(anMon(mx),-(n+1))}
 function anLoad(cb){if(AN.busy){AN.again=cb||function(){};return}AN.busy=true;AN.err=null;var T0=Date.now(),fin=function(){AN.busy=false;AN.at=Date.now();AN.ms=AN.at-T0;cb&&cb();if(AN.again){var c2=AN.again;AN.again=null;anLoad(c2)}};
  anCacheLoad(function(){if(!ghTok()||!ghOnline()){AN.note=Object.keys(AN.files).length?"Offline — showing the price history saved on this device.":null;fin();return}
   ghFetch("contents/"+AN_IDX,"application/vnd.github.raw",function(e,d){
@@ -1735,7 +1739,7 @@ function anLoad(cb){if(AN.busy){AN.again=cb||function(){};return}AN.busy=true;AN
    var L=anIdxParse(d);if(!L){AN.err="history/index.json is not in the expected format.";fin();return}AN.idx=L;
    var cut=anCutDate(L,anCfg()),todo=L.filter(function(f){var c=AN.files[f.path];return (!cut||f.date>=cut)&&(!c||c.rows!==f.rows||c.date!==f.date)}),bad=0,act=0,ended=false;AN.prog={n:0,t:todo.length};
    function pump(){if(ended)return;if(!todo.length&&!act){ended=true;AN.note=bad?bad+" history file"+(bad>1?"s":"")+" could not be read.":null;fin();return}while(act<AN_CONC&&todo.length){act++;one(todo.shift())}}
-   function next(){act--;AN.prog.n++;pump()}
+   function next(){act--;AN.prog.n++;if(AN.prog.n%25===0&&typeof S!=="undefined"&&S.page==="an")try{render()}catch(x){}pump()}
    function one(f){
     ghFetch("contents/"+f.path.split("/").map(encodeURIComponent).join("/"),"application/vnd.github.raw",function(e2,t){if(e2||!t){bad++;next();return}
      Promise.resolve().then(function(){return fileRows(f.path,t)}).then(function(rows){var ap=anParse(f.path,rows,f.date);if(!ap){bad++;return}var o={path:f.path,vendor:f.vendor,date:f.date,rows:f.rows,ap:ap};AN.files[f.path]=o;anCachePut(o)}).catch(function(){bad++}).then(next)},/\.xlsx$/i.test(f.path))}
@@ -1745,7 +1749,7 @@ function anOnChange(t){if(t&&t.id==="dirapts"){var L=anDirParse(t.value);S.direc
  if(t.id==="anv")a.v=t.value;else if(t.id==="anbasis")a.basis=t.value;else if(t.id==="anscale")a.scale=t.value;else if(t.id==="ansort")a.sort=t.value;else if(t.id==="antrip")a.trip=!!t.checked;else if(t.id==="anrng"){a.rng=t.value==="52"||t.value==="all"?t.value:"26";if(AN.started&&typeof setTimeout==="function")anLoad(function(){render()})}else if(t.id==="anup"){var u=pbNum(t.value);if(u>0)a.up=Math.round(u)}
  AN.sel=null;render();save();return true}
 function anOnInput(t){if(!t||t.id!=="anq")return false;anCfg().q=String(t.value||"").toUpperCase();render();save();var q=document.querySelector&&document.querySelector("#anq");if(q&&q.focus){q.focus();try{var n=String(q.value).length;q.setSelectionRange(n,n)}catch(x){}}return true}
-function anOnClick(tg){if(!tg||!tg.closest)return false;var b=tg.closest("button");if(b){if(b.id==="anselx"){AN.sel=null;render();return true}return false}var td=tg.closest("td[data-anc]");if(!td)return false;var k=td.getAttribute("data-anc");AN.sel=AN.sel===k?null:k;render();return true}
+function anOnClick(tg){if(!tg||!tg.closest)return false;var b=tg.closest("button");if(b){if(b.id==="anref"){AN.at=0;anLoad(function(){render()});render();return true}if(b.id==="anselx"){AN.sel=null;render();return true}return false}var td=tg.closest("td[data-anc]");if(!td)return false;var k=td.getAttribute("data-anc");AN.sel=AN.sel===k?null:k;render();return true}
 (function(){if(typeof document==="undefined"||!document.head||!document.createElement)return;var st=document.createElement("style");st.textContent=
  ".anw{overflow:auto;-webkit-overflow-scrolling:touch;max-height:70vh;border:1px solid var(--bd);border-radius:10px;background:var(--card);margin:6px 0}"+
  ".ang{border-collapse:separate;border-spacing:0;font-size:13px;font-variant-numeric:tabular-nums;min-width:100%}"+
