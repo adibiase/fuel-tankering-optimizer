@@ -326,7 +326,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.06.0829",APP_BUILT="2026-11-06 08:29";
+var APP_VERSION="2026.11.06.0926",APP_BUILT="2026-11-06 09:26";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200},{name:"Bombardier CRJ900",rate:0.035,cap:2900,resLb:5000,burn:450,tas:450,plev:250,allow:0.3,route:5,bow:49560,ramp:85000,mtow:84500,mlw:75100,payload:0,taxi:300}],
 legs:[newLeg()]};
@@ -352,7 +352,9 @@ if(!S.resMig){S.aircraft.forEach(function(a){var n=String(a.name||"");if(num(a.r
 if(!S.crjMig){if(!S.aircraft.some(function(a){return ovAcNorm(a.name)==="CRJ900"}))S.aircraft.push(JSON.parse(JSON.stringify(SAMPLE.aircraft.filter(function(a){return a.name==="Bombardier CRJ900"})[0])));S.crjMig=1}
 var LR_PATH="landing-reports/kmbs-latest.json",LR_TAILS={N40D:"Gulfstream G650ER",N650D:"Gulfstream G650ER",N570D:"Dassault Falcon 2000LXS",N897D:"Dassault Falcon 2000LXS"};
 /* one-time per tail 2026-11-06: add N40D/N650D (G650ER) and N570D/N897D (Falcon 2000LXS); a deleted tail is not re-added */
-S.tailMig=S.tailMig||{};Object.keys(LR_TAILS).forEach(function(t){if(S.tailMig[t])return;if(!S.aircraft.some(function(a){return lrTail(a.name)===t})){var b=SAMPLE.aircraft.filter(function(a){return a.name===LR_TAILS[t]})[0],c=JSON.parse(JSON.stringify(b));c.name=t+" ("+ovAcNorm(b.name)+")";S.aircraft.push(c)}S.tailMig[t]=1});   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
+S.tailMig=S.tailMig||{};Object.keys(LR_TAILS).forEach(function(t){if(S.tailMig[t])return;if(!S.aircraft.some(function(a){return lrTail(a.name)===t})){var b=SAMPLE.aircraft.filter(function(a){return a.name===LR_TAILS[t]})[0],c=JSON.parse(JSON.stringify(b));c.name=t+" ("+ovAcNorm(b.name)+")";S.aircraft.push(c)}S.tailMig[t]=1});
+/* one-time 2026-11-06: drop the generic G650ER / Falcon 2000LXS rows (the four tails replace them); tail rows and CRJ900 stay; a generic re-added later is kept */
+if(!S.genMig&&typeof TANK_KEEP_GENERIC==="undefined"){var gSel=S.aircraft[S.ac],gN=/^(gulfstream g650er|dassault falcon 2000lxs)$/i,gK=S.aircraft.filter(function(a){return !gN.test(String(a.name||"").trim())});if(gK.length){var gT=gSel&&gN.test(String(gSel.name||"").trim())?(/falcon/i.test(gSel.name)?"N570D":"N40D"):null;gK=gK.filter(function(a){return lrTail(a.name)}).concat(gK.filter(function(a){return !lrTail(a.name)}));S.aircraft=gK;var gi=gT?gK.findIndex(function(a){return lrTail(a.name)===gT}):gK.indexOf(gSel);S.ac=gi>=0?gi:0}S.genMig=1}   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
 function acNow(){return S.aircraft[S.ac]||S.aircraft[0]}
 /* ---- KMBS landing reports (Satcom Direct, private repo landing-reports/kmbs-latest.json): newest KMBS arrival per tail; fills start fuel when that tail departs KMBS on Leg 1 ---- */
 function lrTail(n){var m=String(n||"").match(/(?:^|[^A-Z0-9])N\s*-?\s*(40|650|570|897)\s*-?\s*D(?![A-Z0-9])/i);return m?"N"+m[1]+"D":null}
@@ -361,12 +363,12 @@ function lrWhen(r){return String(r.arrival_date||"")+"T"+String(r.arrival_time||
 /* merge a report map into S.lr: KMBS + known tail + fuel only; an older arrival never replaces a newer one */
 function lrMerge(js){var o=js;if(typeof o==="string"){try{o=JSON.parse(o)}catch(x){return 0}}if(!o||typeof o!=="object")return 0;if(o.airport&&!lrIsKmbs(o.airport))return 0;var A=o.aircraft||{},n=0;S.lr=S.lr||{};
  Object.keys(A).forEach(function(k){var r=A[k]||{},t=lrTail(r.tail||k),f=parseFloat(r.fuel_lb);if(!t||!LR_TAILS[t]||!(f>0)||!/^\d{4}-\d\d-\d\d$/.test(String(r.arrival_date||"")))return;if(r.airport&&!lrIsKmbs(r.airport))return;
-  var c=S.lr[t];if(c&&lrWhen(c)>lrWhen(r))return;if(c&&lrWhen(c)===lrWhen(r)&&+c.fuel_lb===f)return;S.lr[t]={arrival_date:r.arrival_date,arrival_time:r.arrival_time||null,fuel_lb:f};n++});return n}
+  var c=S.lr[t];if(c&&lrWhen(c)>lrWhen(r))return;if(c&&lrWhen(c)===lrWhen(r)&&+c.fuel_lb===f)return;S.lr[t]={arrival_date:r.arrival_date,arrival_time:r.arrival_time||null,fuel_lb:f,manual:/^manual/i.test(String(r.source||""))};n++});return n}
 function lrNow(){var t=lrTail(acNow().name),l=S.legs[0];if(!t||!l||!lrIsKmbs(l.from))return null;var r=S.lr&&S.lr[t];return r?{t:t,r:r}:null}
 /* apply once per (tail, report): manual edits are kept until the aircraft changes or a newer report loads */
 function lrApply(){var q=lrNow();if(!q){S.lrKey=null;return false}var k=q.t+"|"+lrWhen(q.r)+"|"+q.r.fuel_lb;if(S.lrKey===k)return false;S.lrKey=k;S.startLb=String(Math.round(q.r.fuel_lb));return true}
 function lrDate(d){var m=String(d||"").match(/^(\d{4})-(\d\d)-(\d\d)$/);return m?m[3]+"-"+"JanFebMarAprMayJunJulAugSepOctNovDec".substr((+m[2]-1)*3,3)+"-"+m[1].slice(2):String(d||"")}
-function lrNote(){var q=lrNow();if(!q)return"";var ed=Math.round(num(S.startLb))!==Math.round(q.r.fuel_lb);return '<p class="muted lrnote">From '+esc(q.t)+' KMBS landing '+lrDate(q.r.arrival_date)+(q.r.arrival_time?' '+esc(q.r.arrival_time)+' local':'')+' · '+Math.round(q.r.fuel_lb).toLocaleString("en-US")+' lb'+(ed?' (edited here)':'')+'</p>'}
+function lrNote(){var q=lrNow();if(!q)return"";var ed=Math.round(num(S.startLb))!==Math.round(q.r.fuel_lb);return '<p class="muted lrnote">From '+esc(q.t)+(q.r.manual?' onboard at KMBS ('+lrDate(q.r.arrival_date)+')':' KMBS landing '+lrDate(q.r.arrival_date))+(q.r.arrival_time&&!q.r.manual?' '+esc(q.r.arrival_time)+' local':'')+' · '+Math.round(q.r.fuel_lb).toLocaleString("en-US")+' lb'+(ed?' (edited here)':'')+'</p>'}
 var APT=null;function aptIdx(){if(APT)return APT;APT={};if(typeof APT_DATA==="string")APT_DATA.split("|").forEach(function(r){var f=r.split(",");APT[f[0]]=[+f[1],+f[2],f[3]]});return APT}
 var IATA=null;function iataIdx(){if(IATA)return IATA;IATA={};if(typeof IATA_DATA==="string")for(var k=0;k+7<=IATA_DATA.length;k+=7)IATA[IATA_DATA.substr(k,3)]=IATA_DATA.substr(k+3,4);return IATA}
 function apt(c){c=String(c==null?"":c).replace(/\s+/g,"").toUpperCase();if(!c)return null;var A=aptIdx();if(c.length===4&&A[c])return{code:c,lat:A[c][0],lon:A[c][1],name:A[c][2]};
@@ -445,7 +447,7 @@ function resHint(l){var d=resDef();return '≈ '+gal(resLb(l)/dens())+' gal · '
 function wvHint(l){return blank(l.waiver)?'':'≈ '+gal(num(l.waiver)*dens())+' lb'}
 S.credit=0;S.aircraft.forEach(function(a){var d=WDEF[a.name];if(d&&a.mtow==null)for(var k in d)a[k]=d[k];if(d&&((a.name==='Gulfstream G650ER'&&+a.payload===1600)||(a.name==='Dassault Falcon 2000LXS'&&+a.payload===1200)))a.payload=0});if(!S.view)S.view="auto";if(S.setOpen==null)S.setOpen=false;S.legs.forEach(function(l){delete l.dep;l.from=icaoNorm(l.from);l.to=icaoNorm(l.to);["from","to"].forEach(function(f){if(l[f+"T"]!=null)l[f+"T"]=icaoNorm(l[f+"T"]);var t=l[f+"T"]||l[f];if(t)l[f]=aptIcao(t)});if(l.hoursManual==null)l.hoursManual=!blank(l.hours);if(l.tripManual==null)l.tripManual=!blank(l.trip)});
 ovPurge();fhHeal();   // drop overrides-era saved state (status, errors, toggles, cached rows)
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="fhBusy"||k==="fhStale"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S,function(k,v){return k==="_i"||k==="busy"||k==="fhBusy"||k==="lrBusy"||k==="fhStale"?undefined:v}))}catch(e){}}   // in-flight flags are never persisted
 if(S&&S.gh){delete S.gh.busy;delete S.gh.ovBusy;delete S.gh.runId}   // stale "Checking…" from a run killed mid-check (page closed / iOS suspended) used to lock the button forever
 var $=function(s){return document.querySelector(s)};
 function money(v){return v==null?"n/a":"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -1334,6 +1336,8 @@ function ghAuto(){var g=ghCfg();if(!ghTok()||!ghOnline()||g.busy)return;if(g.las
 /* ---- Auto-refresh: one cheap tree listing (ETag → 304 when nothing changed) compares each folder's latest file SHA; only changed folders are downloaded/imported via ghSync */
 var GH_AUTO_OPTS=[0,5,15,30,60],GH_NOW=null,GH_TOAST_MS=10000;
 function ghNow(){return GH_NOW!=null?GH_NOW:Date.now()}
+/* landing reports load on their own (no tree ETag): a cached 304 tree used to skip this file until the next commit */
+function lrLoad(cb){var g=ghCfg();if(!ghTok()||g.lrBusy){cb&&cb(false);return}g.lrBusy=true;ghFetch("contents/"+LR_PATH,"application/vnd.github.raw",function(e,t){g.lrBusy=false;if(e&&e.status===404)g.lrLoaded=ghNow();if(e||!t){cb&&cb(false);return}var n=lrMerge(t);g.lrLoaded=ghNow();cb&&cb(n>0)})}
 function ghAutoMin(){var g=ghCfg();return g.auto==null?15:+g.auto}
 function ghHidden(){return typeof document!=="undefined"&&document.visibilityState==="hidden"}
 function ghDue(){var g=ghCfg(),m=ghAutoMin(),n=ghNow();if(!m)return false;if(g.nextAt&&n<g.nextAt)return false;return !g.lastPoll||n-g.lastPoll>=m*60e3}
@@ -1341,7 +1345,7 @@ function ghTick(cb){var g=ghCfg();if(fhQ().length&&!g.fhBusy)fhFlush(function(){
 function ghBack(g,e){g.fail=(g.fail||0)+1;var m=ghAutoMin()||15,w=Math.min(m*60e3*Math.pow(2,g.fail-1),6*3600e3);if(e&&e.reset&&e.reset*1000>ghNow())w=Math.max(w,e.reset*1000-ghNow());g.nextAt=ghNow()+w;g.autoErr=e&&e.msg||"check failed"}
 function ghPoll(manual,cb){var g=ghCfg();if(!ghTok()){g.autoErr="Paste a GitHub token first.";cb&&cb(false);return}g.busy=true;g.lastPoll=ghNow();
  ghFetch("git/trees/"+encodeURIComponent(g.branch)+"?recursive=1","application/vnd.github+json",function(e,d,meta){g.busy=false;
-  if(e&&e.status===304){g.fail=0;g.nextAt=0;g.autoErr=null;g.polled=ghNow();cb&&cb(false);return}
+  if(e&&e.status===304){g.fail=0;g.nextAt=0;g.autoErr=null;g.polled=ghNow();if(!g.lrSha&&!g.lrLoaded)lrLoad(function(){render();save()});cb&&cb(false);return}
   if(e){ghBack(g,e);cb&&cb(false);return}
   g.fail=0;g.nextAt=0;g.autoErr=null;g.polled=ghNow();if(meta&&meta.etag)g.etag=meta.etag;
   var mv=((d&&d.tree)||[]).filter(function(x){return x.path===FH_MINV_PATH})[0];if(mv&&mv.sha!==g.minSha){g.minSha=mv.sha;fhMinCheck(function(){render();save()})}
@@ -1831,7 +1835,7 @@ function anOnClick(tg){if(!tg||!tg.closest)return false;var b=tg.closest("button
  ".anleg{margin-left:8px;white-space:nowrap}.anleg i{display:inline-block;width:14px;height:10px;border-radius:2px;margin:0 3px 0 6px;vertical-align:middle}"+
  ".ang tr.analt th,.ang tr.analt td{font-size:11px;color:var(--t2);font-weight:500;padding-top:3px;padding-bottom:5px;background:var(--in)}.ang tr.analt th.anst{background:var(--in);font-weight:500}#sec-andir{margin-bottom:14px}"+".fhask{border-left:3px solid var(--ac);margin:8px 0}.fhask .row .btn{flex:1}"+".andet{margin:8px 0}.andet .lk{margin-top:4px}.anc .row>div{min-width:130px}@media(max-width:420px){.ang{font-size:12px}.ang th,.ang td{padding:6px 5px;min-width:44px}}";
  document.head.appendChild(st)})();
-fhStaleBoot();authInit();render();if(typeof setTimeout==="function"){var mvt=setTimeout(function(){fhMinRecheck(true)},800);if(mvt&&mvt.unref)mvt.unref()}if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("focus",fhMinRecheck);window.addEventListener("pageshow",fhMinRecheck)}if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!document.hidden)fhMinRecheck()});pbLoad(function(){if(PB.vendors.length){render();save()}if(ghAutoMin())ghTick(function(ch){if(ch)render();save()});else ghAuto()});ghStart();
+fhStaleBoot();authInit();render();if(typeof setTimeout==="function"){var mvt=setTimeout(function(){fhMinRecheck(true);lrLoad(function(){render();save()})},800);if(mvt&&mvt.unref)mvt.unref()}if(typeof window!=="undefined"&&window.addEventListener){window.addEventListener("focus",fhMinRecheck);window.addEventListener("pageshow",fhMinRecheck)}if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("visibilitychange",function(){if(!document.hidden)fhMinRecheck()});pbLoad(function(){if(PB.vendors.length){render();save()}if(ghAutoMin())ghTick(function(ch){if(ch)render();save()});else ghAuto()});ghStart();
 if(typeof setTimeout==="function"){var ut=setTimeout(function(){updCheck()},1500);if(ut&&ut.unref)ut.unref()}
 if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("online",function(){if(gateOn()&&ghTok())authBg()});
 (function(){var f=S.fcst||{},on=typeof navigator==="undefined"||navigator.onLine!==false;if(typeof fetch==="function"&&on&&S.legs.some(function(l){return legRoute(l)})&&(!f.at||Date.now()-f.at>3600e3))fetchWinds(function(){render();save()})})();
