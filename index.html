@@ -326,7 +326,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.06.0926",APP_BUILT="2026-11-06 09:26";
+var APP_VERSION="2026.11.06.0934",APP_BUILT="2026-11-06 09:34";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200},{name:"Bombardier CRJ900",rate:0.035,cap:2900,resLb:5000,burn:450,tas:450,plev:250,allow:0.3,route:5,bow:49560,ramp:85000,mtow:84500,mlw:75100,payload:0,taxi:300}],
 legs:[newLeg()]};
@@ -354,7 +354,12 @@ var LR_PATH="landing-reports/kmbs-latest.json",LR_TAILS={N40D:"Gulfstream G650ER
 /* one-time per tail 2026-11-06: add N40D/N650D (G650ER) and N570D/N897D (Falcon 2000LXS); a deleted tail is not re-added */
 S.tailMig=S.tailMig||{};Object.keys(LR_TAILS).forEach(function(t){if(S.tailMig[t])return;if(!S.aircraft.some(function(a){return lrTail(a.name)===t})){var b=SAMPLE.aircraft.filter(function(a){return a.name===LR_TAILS[t]})[0],c=JSON.parse(JSON.stringify(b));c.name=t+" ("+ovAcNorm(b.name)+")";S.aircraft.push(c)}S.tailMig[t]=1});
 /* one-time 2026-11-06: drop the generic G650ER / Falcon 2000LXS rows (the four tails replace them); tail rows and CRJ900 stay; a generic re-added later is kept */
-if(!S.genMig&&typeof TANK_KEEP_GENERIC==="undefined"){var gSel=S.aircraft[S.ac],gN=/^(gulfstream g650er|dassault falcon 2000lxs)$/i,gK=S.aircraft.filter(function(a){return !gN.test(String(a.name||"").trim())});if(gK.length){var gT=gSel&&gN.test(String(gSel.name||"").trim())?(/falcon/i.test(gSel.name)?"N570D":"N40D"):null;gK=gK.filter(function(a){return lrTail(a.name)}).concat(gK.filter(function(a){return !lrTail(a.name)}));S.aircraft=gK;var gi=gT?gK.findIndex(function(a){return lrTail(a.name)===gT}):gK.indexOf(gSel);S.ac=gi>=0?gi:0}S.genMig=1}   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
+/* every load (idempotent, 2026-11-06): the four tails are always listed; generic G650ER / Falcon 2000LXS rows (full or short names) are hidden templates, never selectable; tails first, then CRJ900/custom */
+(function(){var keep=typeof TANK_KEEP_GENERIC!=="undefined",sel=S.aircraft[S.ac],gen=function(a){var n=String(a&&a.name||"").trim();if(lrTail(n))return false;var k=ovAcNorm(n);return(k==="G650ER"||k==="Falcon 2000LXS")&&/^(gulfstream\s*)?g650\s*er$|^(dassault\s*)?falcon\s*2000\s*lxs$/i.test(n)};
+ Object.keys(LR_TAILS).forEach(function(t){if(S.aircraft.some(function(a){return lrTail(a.name)===t}))return;var b=SAMPLE.aircraft.filter(function(a){return a.name===LR_TAILS[t]})[0],c=JSON.parse(JSON.stringify(b));c.name=t+" ("+ovAcNorm(b.name)+")";S.aircraft.push(c)});
+ var gT=sel&&gen(sel)?(/falcon/i.test(sel.name)?"N570D":"N40D"):null,K=keep?S.aircraft:S.aircraft.filter(function(a){return !gen(a)});
+ if(!keep)K=K.filter(function(a){return lrTail(a.name)}).sort(function(a,b){return Object.keys(LR_TAILS).indexOf(lrTail(a.name))-Object.keys(LR_TAILS).indexOf(lrTail(b.name))}).concat(K.filter(function(a){return !lrTail(a.name)}));
+ S.aircraft=K;var gi=gT&&!keep?K.findIndex(function(a){return lrTail(a.name)===gT}):K.indexOf(sel);S.ac=gi>=0?gi:0;S.genMig=2})();   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
 function acNow(){return S.aircraft[S.ac]||S.aircraft[0]}
 /* ---- KMBS landing reports (Satcom Direct, private repo landing-reports/kmbs-latest.json): newest KMBS arrival per tail; fills start fuel when that tail departs KMBS on Leg 1 ---- */
 function lrTail(n){var m=String(n||"").match(/(?:^|[^A-Z0-9])N\s*-?\s*(40|650|570|897)\s*-?\s*D(?![A-Z0-9])/i);return m?"N"+m[1]+"D":null}
