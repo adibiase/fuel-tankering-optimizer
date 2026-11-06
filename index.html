@@ -326,7 +326,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.06.1051",APP_BUILT="2026-11-06 10:51";
+var APP_VERSION="2026.11.06.1052",APP_BUILT="2026-11-06 10:52";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200},{name:"Bombardier CRJ900",rate:0.035,cap:2900,resLb:5000,burn:450,tas:450,plev:250,allow:0.3,route:5,bow:49560,ramp:85000,mtow:84500,mlw:75100,payload:0,taxi:300}],
 legs:[newLeg()]};
@@ -1472,7 +1472,7 @@ function fhApply(l){delete l.hdl;delete l.ovr;delete l.ovPrice;delete l.ovSrc;de
  if(fhDirZero(l)){l.fee=0;l.waiver=0;l.noWaiver=false;l.fhSt="dirzero";return}
  var mem=l.fhOverrides=l.fhOverrides||{};if(l.fhOv)mem[l.fhOv.k]=l.fhOv;
  if(pk&&pk!==k){delete l.fhOv;if(mem[k])l.fhOv=mem[k]}
- if(!fb){if(!pk&&!l.fhOv)l.fhOv={k:k,fee:l.fee,waiver:l.waiver,trip:true};var m=l.fhOv&&l.fhOv.k===k?l.fhOv:null;l.fee=m?m.fee:"";l.waiver=m?m.waiver:"";l.fhSt="nofbo";l.noWaiver=false;return}
+ if(!fb){if(!l.fhOv&&(!pk||pk===k))l.fhOv={k:k,fee:l.fee,waiver:l.waiver,trip:true};var m=l.fhOv&&l.fhOv.k===k?l.fhOv:null;l.fee=m?m.fee:"";l.waiver=m?m.waiver:"";l.fhSt="nofbo";l.noWaiver=false;return}
  var o=fhFind(l.from,fb,ac),ov=l.fhOv;
  if(ov&&ov.k===k){if(o)l.fhr=o;var nf=fhNum(ov.fee),nw=fhNum(ov.waiver);l.fee=nf==null?ov.fee:nf;l.waiver=nw==null?ov.waiver:nw;l.noWaiver=false;l.feeManual=l.waiverManual=true;if(o&&!fhCall(o)&&fhNum(ov.fee)===o.handling_fee&&fhNum(ov.waiver)===o.waiver_gal){delete mem[k];delete l.fhOv}else{l.fhSt="ov";return}}
  else if(ov)delete l.fhOv;
@@ -1617,7 +1617,7 @@ function fhNormNear(f){return fhNormFbo(f).replace(/[^a-z0-9 ]+/g," ").split(" "
 function fhNormKey(o){return fhNormApt(o.airport)+"|"+fhNormFbo(o.fbo)+"|"+String(fhAc(o.aircraft)).trim().toLowerCase()}
 function fhNumS(v){return v==null||v===""?"":String(v)}
 function fhRank(o){var s=fhSrcOf(o);return s==="Signature schedule"?0:1}
-/* keep-precedence: newest effective_date, then Manual/Leg card over Signature schedule, then newest updated_at */
+/* Keep the most current update per airport + FBO + aircraft group; source breaks exact timestamp ties. */
 function fhKeepCmp(a,b){var ua=String(a.updated_at||a.effective_date||""),ub=String(b.updated_at||b.effective_date||"");if(ua!==ub)return ua>ub?-1:1;var ea=String(a.effective_date||""),eb=String(b.effective_date||"");if(ea!==eb)return ea>eb?-1:1;return fhRank(b)-fhRank(a)}
 function fhDupScan(){var pool=[],sig={},add=function(o,where){var k=fhNormKey(o),s=k+"|"+fhNumS(o.handling_fee)+"|"+fhNumS(o.waiver_gal)+"|"+String(o.effective_date||"")+"|"+String(o.updated_at||"");
   if(sig[s]&&!sig[s].where[where]){sig[s].where[where]=1;return}var e={o:o,k:k,where:{}};e.where[where]=1;sig[s]=e;pool.push(e)};
