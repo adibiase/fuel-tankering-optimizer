@@ -1,6 +1,6 @@
 # Fuel Tankering Optimizer
 
-Single-file offline web app for multi-leg jet fuel tankering and FBO handling-fee optimization (G650ER / Falcon 2000LXS profiles, editable).
+Single-file offline web app for multi-leg jet fuel tankering and FBO handling-fee optimization (G650ER / Falcon 2000LXS / CRJ900 profiles, editable).
 
 **Open the app:** https://adibiase.github.io/fuel-tankering-optimizer/
 

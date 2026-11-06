@@ -326,9 +326,9 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.03.0955",APP_BUILT="2026-11-03 09:55";
+var APP_VERSION="2026.11.05.1956",APP_BUILT="2026-11-05 19:56";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
-aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}],
+aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200},{name:"Bombardier CRJ900",rate:0.035,cap:2900,resLb:5000,burn:450,tas:450,plev:250,allow:0.3,route:5,bow:49560,ramp:85000,mtow:84500,mlw:75100,payload:0,taxi:300}],
 legs:[newLeg()]};
 var RES_LB=5000;function resDef(){var a=S&&S.aircraft&&(S.aircraft[S.ac]||S.aircraft[0]);var v=a?num(a.resLb):NaN;return v>0?v:RES_LB}   // leg reserve blank = aircraft profile default
 function newLeg(){return{from:"",to:"",hours:"",hoursManual:false,wind:"",windManual:false,trip:"",tripManual:false,reserveLb:"",price:"",fee:"",waiver:"",payload:"",fixU:""}}
@@ -336,7 +336,7 @@ function num(v){var x=parseFloat(v);return isNaN(x)?0:x}
 function blank(v){return v==null||String(v).trim()===""}
 function dens(){return num(S.density)||6.7}
 function startGal(){return num(S.startLb)/dens()}
-var WDEF={"Gulfstream G650ER":{bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},"Dassault Falcon 2000LXS":{bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200}};
+var WDEF={"Gulfstream G650ER":{bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},"Dassault Falcon 2000LXS":{bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200},"Bombardier CRJ900":{bow:49560,ramp:85000,mtow:84500,mlw:75100,payload:0,taxi:300}};
 var KEY="tankering.v6",S;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.legs)S=JSON.parse(JSON.stringify(SAMPLE));
@@ -347,7 +347,9 @@ S.aircraft.forEach(function(a){if(a.resLb==null){a.resLb=Math.round(num(a.res)*S
 S.legs.forEach(function(l){if(l.hs!=="w"&&l.hs!=="p")delete l.hs});
 /* one-time 2026-11-02: default reserves G650ER 5,000 lb / Falcon 2000LXS 3,000 lb (old default 5,000 lb for both). Only values still at the old default change;
    leg reserves equal to the old auto-filled 5,000 lb become blank (= the aircraft's default) */
-if(!S.resMig){S.aircraft.forEach(function(a){var n=String(a.name||"");if(num(a.resLb)===5000&&/falcon\s*2000\s*lxs/i.test(n))a.resLb=3000});S.legs.forEach(function(l){if(!blank(l.reserveLb)&&num(l.reserveLb)===5000)l.reserveLb=""});S.resMig=1}   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
+if(!S.resMig){S.aircraft.forEach(function(a){var n=String(a.name||"");if(num(a.resLb)===5000&&/falcon\s*2000\s*lxs/i.test(n))a.resLb=3000});S.legs.forEach(function(l){if(!blank(l.reserveLb)&&num(l.reserveLb)===5000)l.reserveLb=""});S.resMig=1}
+/* one-time 2026-11-05: add the Bombardier CRJ900 (LR weights) to saved aircraft tables that do not already have one */
+if(!S.crjMig){if(!S.aircraft.some(function(a){return ovAcNorm(a.name)==="CRJ900"}))S.aircraft.push(JSON.parse(JSON.stringify(SAMPLE.aircraft.filter(function(a){return a.name==="Bombardier CRJ900"})[0])));S.crjMig=1}   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
 function acNow(){return S.aircraft[S.ac]||S.aircraft[0]}
 var APT=null;function aptIdx(){if(APT)return APT;APT={};if(typeof APT_DATA==="string")APT_DATA.split("|").forEach(function(r){var f=r.split(",");APT[f[0]]=[+f[1],+f[2],f[3]]});return APT}
 var IATA=null;function iataIdx(){if(IATA)return IATA;IATA={};if(typeof IATA_DATA==="string")for(var k=0;k+7<=IATA_DATA.length;k+=7)IATA[IATA_DATA.substr(k,3)]=IATA_DATA.substr(k+3,4);return IATA}
@@ -1360,11 +1362,11 @@ function ovWho(cb){var g=ghCfg();if(g.login){cb();return}ovReq("GET","https://ap
 var OV_RO="Your GitHub token can read but not write. To save FBO Handling entries, edit the token: Repository permissions › Contents › Read and write (repo adibiase/fuel-prices).";
 /* master import: diff against the current file, confirm → one commit */
 /* handling fee + waiver are per aircraft: aliases → canonical type; manual leg values are kept per aircraft and swapped on aircraft change */
-function ovAcNorm(s){var t=String(s||"").trim(),x=t.toLowerCase();if(!x)return"";if(/g650|glf6|^sj$|gulfstream/.test(x))return"G650ER";if(/f2th|fa2k|falcon|^hj$|2000\s*lxs|^2000$/.test(x))return"Falcon 2000LXS";return t}
+function ovAcNorm(s){var t=String(s||"").trim(),x=t.toLowerCase();if(!x)return"";if(/g650|glf6|^sj$|gulfstream/.test(x))return"G650ER";if(/f2th|fa2k|falcon|^hj$|2000\s*lxs|^2000$/.test(x))return"Falcon 2000LXS";if(/crj\s*-?\s*9|^cr9$|^crj$|cl-?600-?2d24/.test(x))return"CRJ900";return t}
 function acKey(){return ovAcNorm(acNow().name)||acNow().name}
 /* ---- FBO Handling page: shared per-aircraft handling fee + waiver gal per airport/FBO (private repo fbo-handling/latest.csv) ----
    PRIMARY source: value typed on a leg (written back here) › this table › blank + inline alert (overrides retired; Signature schedule = suggestion only) */
-var FH_COLS=["airport","fbo","aircraft","handling_fee","waiver_gal","effective_date","note","updated_at","updated_by","source"],FH_PATH="fbo-handling/latest.csv",FH_F=["handling_fee","waiver_gal","effective_date","note","source"],FH_ACS=["G650ER","Falcon 2000LXS"];
+var FH_COLS=["airport","fbo","aircraft","handling_fee","waiver_gal","effective_date","note","updated_at","updated_by","source"],FH_PATH="fbo-handling/latest.csv",FH_F=["handling_fee","waiver_gal","effective_date","note","source"],FH_ACS=["G650ER","Falcon 2000LXS","CRJ900"],FH_BOTH=["G650ER","Falcon 2000LXS"];
 /* "Call FBO for pricing" flag: kept in the note column (old app copies keep it verbatim); last known fee / waiver stay as reference */
 var FH_CALL="Call FBO for pricing";function fhCall(o){return !!o&&/^\s*call fbo for pricing/i.test(String(o.note||""))}
 function fhCallNote(date,sp){return FH_CALL+" — "+(sp?"Signature Simplified Parking (excluded from "+date+" handling report)":"not in the "+date+" Signature handling report")}
@@ -1380,7 +1382,7 @@ function fhNum(v){v=String(v==null?"":v).trim();if(v==="")return null;var n=pbNu
 function fhRowCheck(o){var e=[],apt=String(o.airport||"").trim().toUpperCase(),ic=apt?aptIcao(apt):"",acs=[],a=String(o.aircraft||"").trim();
  if(!apt)e.push("airport required");else if(!ic||!aptIdx()[ic])e.push("unknown airport "+apt);
  if(!String(o.fbo||"").trim())e.push("FBO name required");
- if(!a)e.push("aircraft required (G650ER, Falcon 2000LXS or Both)");else if(/^both$/i.test(a))acs=FH_ACS.slice();else{var n=ovAcNorm(a);if(FH_ACS.indexOf(n)<0)e.push("unknown aircraft "+a+" (use G650ER, Falcon 2000LXS or Both)");else acs=[n]}
+ if(!a)e.push("aircraft required (G650ER, Falcon 2000LXS, CRJ900 or Both)");else if(/^both$/i.test(a))acs=FH_BOTH.slice();else{var n=ovAcNorm(a);if(FH_ACS.indexOf(n)<0)e.push("unknown aircraft "+a+" (use G650ER, Falcon 2000LXS, CRJ900 or Both)");else acs=[n]}
  var fee=fhNum(o.handling_fee),wv=fhNum(o.waiver_gal);if(fee==null)e.push("handling fee required");else if(!(fee>=0))e.push("handling fee must be a number ≥ 0");if(wv!=null&&!(wv>=0))e.push("waiver gal must be a number ≥ 0 (blank = no waiver)");
  var ed=String(o.effective_date||"").trim(),edn=ed?pbDate(ed):"";if(ed&&!edn)e.push("effective date not understood ("+ed+")");
  if(e.length)return{err:e};return{rows:acs.map(function(ac){return{airport:ic,fbo:String(o.fbo).trim(),aircraft:ac,handling_fee:fee,waiver_gal:wv,effective_date:edn||"",note:String(o.note||"").trim()}})}}
@@ -1464,7 +1466,7 @@ function fhLegHtml0(l,i){var st=l.fhSt,fb=ovFboOf(l),ac=acKey(),o=l.fhr,note='<s
  if(st==="ov"&&l.fhOv)return fhOvHtml(l,i);var sv=S.fhLegMsg&&S.fhLegMsg.i===i&&Date.now()-S.fhLegMsg.at<8000?'<div class="hint hdl" role="status">✓ Saved to FBO Handling'+(S.fhLegMsg.off?' — will sync when online':'')+'</div>':'';if(sv&&st==="ok")return sv+'<div class="hint hdl">Handling from FBO Handling table ('+esc(o.aircraft)+')</div>';
  if(st==="dirzero")return '<div class="hint hdl">Direct fuel at '+esc(l.from)+' — no handling fee or waiver (expected).</div>';
  if(st==="nofbo")return '<div class="hint hdl">Pick an FBO above to use the FBO Handling table — values typed here apply to this leg only.</div>';
- if(st==="missing"){var s=fhSug(l);return '<div class="card warn fhmiss">⚠️ <b>No FBO Handling entry</b> for '+esc(fb)+' at '+esc(l.from)+' ('+esc(ac)+'). Enter a handling fee / waiver gallons in the fields above — it’s used on this trip and you’ll be asked whether to save it to the FBO Handling table.'+(FH_ACS.indexOf(ac)<0?'<br><span class="lsub">The table covers G650ER and Falcon 2000LXS only — values for this aircraft stay on this leg.</span>':'')+(s?'<div class="row" style="margin-top:6px"><span class="sm">'+esc(s.name||"Signature")+' schedule suggests $'+gal(s.fee)+' fee, '+(s.w==null?'no waiver':'waive '+gal(s.w)+' gal')+'</span><button class="btn" data-fhsug="'+i+'">Use these</button></div>':'')+'</div>'}
+ if(st==="missing"){var s=fhSug(l);return '<div class="card warn fhmiss">⚠️ <b>No FBO Handling entry</b> for '+esc(fb)+' at '+esc(l.from)+' ('+esc(ac)+'). Enter a handling fee / waiver gallons in the fields above — it’s used on this trip and you’ll be asked whether to save it to the FBO Handling table.'+(FH_ACS.indexOf(ac)<0?'<br><span class="lsub">The table covers G650ER, Falcon 2000LXS and CRJ900 only — values for this aircraft stay on this leg.</span>':'')+(s?'<div class="row" style="margin-top:6px"><span class="sm">'+esc(s.name||"Signature")+' schedule suggests $'+gal(s.fee)+' fee, '+(s.w==null?'no waiver':'waive '+gal(s.w)+' gal')+'</span><button class="btn" data-fhsug="'+i+'">Use these</button></div>':'')+'</div>'}
  if(st==="zero")return '<div class="card warn fhzero">⚠️ <b>Zero handling</b> — '+(o.handling_fee===0?'handling fee $0':'')+(o.handling_fee===0&&o.waiver_gal===0?' and ':'')+(o.waiver_gal===0?'waiver 0 gal':'')+' for '+esc(o.fbo)+' ('+esc(o.aircraft)+'). Is “no fees” correct?<div class="row" style="margin-top:6px"><button class="btn pri" data-fhz="'+i+'">Confirm no fees</button></div>'+note+'</div>';
  if(st==="ok"&&o)return '<div class="hint hdl">Handling from FBO Handling table ('+esc(o.aircraft)+')'+(o.updated_by?' · '+esc(o.updated_by):'')+(o.updated_at?' · '+esc(pbDTxt(String(o.updated_at).slice(0,10))):'')+(fhConf(o)?' <span class="tg">no fees confirmed</span>':'')+'<br>'+note+'</div>';return ""}
 function fhWarn(){var a=[];S.legs.forEach(function(l){if(l.fhSt==="zero")a.push(l.from+": zero handling not confirmed");else if(l.fhSt==="missing")a.push(l.from+": no FBO Handling entry")});return a}
@@ -1614,7 +1616,7 @@ function fhPageHtml(){var f=fhForm(),E=S.fhErr||{},g=ghCfg(),ic=f.apt?aptIcao(f.
  var h='<h2>FBO handling fees</h2><div class="card"><b>'+(S.fhEdit?'Edit entry':'Add an FBO handling fee')+'</b><p class="muted">Per aircraft. Saved to the shared file fbo-handling/latest.csv in the private repo and used by the planner.</p>';
  h+='<div class="row"><div><label>Airport <span class="lsub">ICAO or IATA</span></label>'+inp("fhForm.apt",f.apt,null,"KTEB")+'<div class="hint">'+(ap?esc(ic+" · "+ap[2]):f.apt?'<span style="color:var(--bad)">not found</span>':'')+'</div>'+er("apt")+'</div>';
  h+='<div><label>FBO name</label><input data-p="fhForm.fbo" value="'+esc(f.fbo)+'" list="fhfbos" autocapitalize="words" placeholder="e.g. Signature East"><datalist id="fhfbos">'+(ic?fhSugg(ic).map(function(s){return '<option value="'+esc(s)+'">'}).join(""):"")+'</datalist>'+er("fbo")+'</div></div>';
- h+='<label>Aircraft</label><div class="seg fhac">'+["G650ER","Falcon 2000LXS","Both"].map(function(a){return '<button data-fhac="'+a+'" class="'+(f.ac===a?"on":"")+'">'+a+'</button>'}).join("")+'</div>'+er("ac");
+ h+='<label>Aircraft</label><div class="seg fhac">'+["G650ER","Falcon 2000LXS","CRJ900","Both"].map(function(a){return '<button data-fhac="'+a+'" class="'+(f.ac===a?"on":"")+'">'+a+'</button>'}).join("")+'</div>'+er("ac");
  h+='<div class="row"><div><label>Handling fee $'+(f.ac==="Both"?' <span class="lsub">G650ER</span>':'')+'</label>'+inp("fhForm.fee",f.fee,"decimal","0")+er("fee")+'</div><div><label>Gallons to waive'+(f.ac==="Both"?' <span class="lsub">G650ER</span>':'')+'</label>'+inp("fhForm.wv",f.wv,"decimal","blank = no waiver")+er("wv")+'</div></div>';
  if(f.ac==="Both")h+='<div class="row"><div><label>Handling fee $ <span class="lsub">Falcon (blank = same)</span></label>'+inp("fhForm.fee2",f.fee2,"decimal")+er("fee2")+'</div><div><label>Gallons to waive <span class="lsub">Falcon (blank = same)</span></label>'+inp("fhForm.wv2",f.wv2,"decimal")+er("wv2")+'</div></div>';
  h+='<div class="row"><div><label>Effective date <span class="lsub">optional</span></label><input data-p="fhForm.eff" value="'+esc(f.eff)+'" type="date">'+er("eff")+'</div><div><label>Note <span class="lsub">optional</span></label><input data-p="fhForm.note" value="'+esc(f.note)+'" autocapitalize="sentences"></div></div>';
