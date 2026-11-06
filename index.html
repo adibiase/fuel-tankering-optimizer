@@ -326,7 +326,7 @@ function optimize(inp){var t0=(typeof performance!=="undefined"&&performance.now
   out.ms=((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0;
   return out}
 /* APP_VERSION is stamped by dev/build_html.py on every build (YYYY.MM.DD.HHMM, US Central) — do not edit by hand */
-var APP_VERSION="2026.11.05.2009",APP_BUILT="2026-11-05 20:09";
+var APP_VERSION="2026.11.06.0829",APP_BUILT="2026-11-06 08:29";
 var SAMPLE={resMig:1,ac:0,chargeZero:true,credit:0,startLb:"",density:6.7,trip:"",
 aircraft:[{name:"Gulfstream G650ER",rate:0.03,cap:7150,resLb:5000,burn:470,tas:488,plev:200,allow:0.3,route:5,bow:54000,ramp:104000,mtow:103600,mlw:83500,payload:0,taxi:300},{name:"Dassault Falcon 2000LXS",rate:0.04,cap:2500,resLb:3000,burn:265,tas:470,plev:250,allow:0.3,route:5,bow:24750,ramp:43000,mtow:42800,mlw:39300,payload:0,taxi:200},{name:"Bombardier CRJ900",rate:0.035,cap:2900,resLb:5000,burn:450,tas:450,plev:250,allow:0.3,route:5,bow:49560,ramp:85000,mtow:84500,mlw:75100,payload:0,taxi:300}],
 legs:[newLeg()]};
@@ -349,8 +349,24 @@ S.legs.forEach(function(l){if(l.hs!=="w"&&l.hs!=="p")delete l.hs});
    leg reserves equal to the old auto-filled 5,000 lb become blank (= the aircraft's default) */
 if(!S.resMig){S.aircraft.forEach(function(a){var n=String(a.name||"");if(num(a.resLb)===5000&&/falcon\s*2000\s*lxs/i.test(n))a.resLb=3000});S.legs.forEach(function(l){if(!blank(l.reserveLb)&&num(l.reserveLb)===5000)l.reserveLb=""});S.resMig=1}
 /* one-time 2026-11-05: add the Bombardier CRJ900 (LR weights) to saved aircraft tables that do not already have one */
-if(!S.crjMig){if(!S.aircraft.some(function(a){return ovAcNorm(a.name)==="CRJ900"}))S.aircraft.push(JSON.parse(JSON.stringify(SAMPLE.aircraft.filter(function(a){return a.name==="Bombardier CRJ900"})[0])));S.crjMig=1}   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
+if(!S.crjMig){if(!S.aircraft.some(function(a){return ovAcNorm(a.name)==="CRJ900"}))S.aircraft.push(JSON.parse(JSON.stringify(SAMPLE.aircraft.filter(function(a){return a.name==="Bombardier CRJ900"})[0])));S.crjMig=1}
+var LR_PATH="landing-reports/kmbs-latest.json",LR_TAILS={N40D:"Gulfstream G650ER",N650D:"Gulfstream G650ER",N570D:"Dassault Falcon 2000LXS",N897D:"Dassault Falcon 2000LXS"};
+/* one-time per tail 2026-11-06: add N40D/N650D (G650ER) and N570D/N897D (Falcon 2000LXS); a deleted tail is not re-added */
+S.tailMig=S.tailMig||{};Object.keys(LR_TAILS).forEach(function(t){if(S.tailMig[t])return;if(!S.aircraft.some(function(a){return lrTail(a.name)===t})){var b=SAMPLE.aircraft.filter(function(a){return a.name===LR_TAILS[t]})[0],c=JSON.parse(JSON.stringify(b));c.name=t+" ("+ovAcNorm(b.name)+")";S.aircraft.push(c)}S.tailMig[t]=1});   // handling strategy per leg/stop: absent = Auto (optimize), "w" = buy min to waive, "p" = pay fee
 function acNow(){return S.aircraft[S.ac]||S.aircraft[0]}
+/* ---- KMBS landing reports (Satcom Direct, private repo landing-reports/kmbs-latest.json): newest KMBS arrival per tail; fills start fuel when that tail departs KMBS on Leg 1 ---- */
+function lrTail(n){var m=String(n||"").match(/(?:^|[^A-Z0-9])N\s*-?\s*(40|650|570|897)\s*-?\s*D(?![A-Z0-9])/i);return m?"N"+m[1]+"D":null}
+function lrIsKmbs(c){c=String(c||"").replace(/\s+/g,"").toUpperCase();return c==="KMBS"||c==="MBS"}
+function lrWhen(r){return String(r.arrival_date||"")+"T"+String(r.arrival_time||"00:00")}
+/* merge a report map into S.lr: KMBS + known tail + fuel only; an older arrival never replaces a newer one */
+function lrMerge(js){var o=js;if(typeof o==="string"){try{o=JSON.parse(o)}catch(x){return 0}}if(!o||typeof o!=="object")return 0;if(o.airport&&!lrIsKmbs(o.airport))return 0;var A=o.aircraft||{},n=0;S.lr=S.lr||{};
+ Object.keys(A).forEach(function(k){var r=A[k]||{},t=lrTail(r.tail||k),f=parseFloat(r.fuel_lb);if(!t||!LR_TAILS[t]||!(f>0)||!/^\d{4}-\d\d-\d\d$/.test(String(r.arrival_date||"")))return;if(r.airport&&!lrIsKmbs(r.airport))return;
+  var c=S.lr[t];if(c&&lrWhen(c)>lrWhen(r))return;if(c&&lrWhen(c)===lrWhen(r)&&+c.fuel_lb===f)return;S.lr[t]={arrival_date:r.arrival_date,arrival_time:r.arrival_time||null,fuel_lb:f};n++});return n}
+function lrNow(){var t=lrTail(acNow().name),l=S.legs[0];if(!t||!l||!lrIsKmbs(l.from))return null;var r=S.lr&&S.lr[t];return r?{t:t,r:r}:null}
+/* apply once per (tail, report): manual edits are kept until the aircraft changes or a newer report loads */
+function lrApply(){var q=lrNow();if(!q){S.lrKey=null;return false}var k=q.t+"|"+lrWhen(q.r)+"|"+q.r.fuel_lb;if(S.lrKey===k)return false;S.lrKey=k;S.startLb=String(Math.round(q.r.fuel_lb));return true}
+function lrDate(d){var m=String(d||"").match(/^(\d{4})-(\d\d)-(\d\d)$/);return m?m[3]+"-"+"JanFebMarAprMayJunJulAugSepOctNovDec".substr((+m[2]-1)*3,3)+"-"+m[1].slice(2):String(d||"")}
+function lrNote(){var q=lrNow();if(!q)return"";var ed=Math.round(num(S.startLb))!==Math.round(q.r.fuel_lb);return '<p class="muted lrnote">From '+esc(q.t)+' KMBS landing '+lrDate(q.r.arrival_date)+(q.r.arrival_time?' '+esc(q.r.arrival_time)+' local':'')+' · '+Math.round(q.r.fuel_lb).toLocaleString("en-US")+' lb'+(ed?' (edited here)':'')+'</p>'}
 var APT=null;function aptIdx(){if(APT)return APT;APT={};if(typeof APT_DATA==="string")APT_DATA.split("|").forEach(function(r){var f=r.split(",");APT[f[0]]=[+f[1],+f[2],f[3]]});return APT}
 var IATA=null;function iataIdx(){if(IATA)return IATA;IATA={};if(typeof IATA_DATA==="string")for(var k=0;k+7<=IATA_DATA.length;k+=7)IATA[IATA_DATA.substr(k,3)]=IATA_DATA.substr(k+3,4);return IATA}
 function apt(c){c=String(c==null?"":c).replace(/\s+/g,"").toUpperCase();if(!c)return null;var A=aptIdx();if(c.length===4&&A[c])return{code:c,lat:A[c][0],lon:A[c][1],name:A[c][2]};
@@ -703,11 +719,11 @@ if(MQ){var mqf=function(){if((S.view||"auto")==="auto")render()};if(MQ.addEventL
 function resTable(r,a,sv){var h='<div class="card rtab"><b>Per-stop plan</b><div class="tw"><table><thead><tr><th>Stop</th><th>Action</th><th>Uplift</th><th>Price</th><th>Fuel cost</th><th>Fee</th><th>Eff $/gal</th><th>Dep fuel</th><th>Arr fuel</th></tr></thead><tbody>';
  r.rows.forEach(function(x,i){var l=r.legs[i],k=cat(x,l,a.cap);h+='<tr style="box-shadow:inset 4px 0 '+k.c+'"><td><b>'+esc(l.from||"?")+'</b><div class="lbu">→ '+esc(l.to||"?")+'</div></td><td>'+chip(k)+'<div class="lbu">'+esc(x.decision)+'</div>'+pbLine(x,l,true)+'</td><td>'+fq(x.u)+'</td><td>$'+x.tp.toFixed(2)+'</td><td>'+money(x.fuel)+'</td><td>'+(x.fee===0&&l.fee>0?'<span style="color:var(--ok)">waived</span><div class="lbu">$'+gal(l.fee)+' · waive '+gal(l.w)+' gal</div>':money(x.fee)+'<div class="lbu">waive ≥ '+gal(l.w)+' gal</div>')+'</td><td>'+(x.eff==null?'n/a':'$'+x.eff.toFixed(3))+'</td><td>'+fq(x.dep)+'</td><td>'+fq(x.arr)+'<div class="lbu">reserve '+gal(l.res*dens())+' lb</div></td></tr>'+(l.bow!=null?'<tr class="wrow" style="box-shadow:inset 4px 0 '+k.c+'"><td></td><td colspan="8">'+(x.wlim?limChip(x)+' ':'')+wLine(x,l,true).replace('<br>',' &nbsp;·&nbsp; ')+'</td></tr>':'')+(sv&&sv.by[i]?'<tr class="nrow"><td></td><td colspan="8">'+noteHtml(sv.by[i])+'</td></tr>':'')});
  return h+'</tbody></table></div></div>'}
-function render(){if(authNeeded()){signinRender();return}if(typeof document!=="undefined"&&document.body&&document.body.classList)document.body.classList.remove("gate");S.legs.forEach(function(l,i){l._i=i;syncHours(l);syncTrip(l);pbAuto(l,i);fhApply(l)});var r=compute();TT_R=r;pbApply(r);var a=S.aircraft[S.ac]||S.aircraft[0],h="";
+function render(){if(authNeeded()){signinRender();return}lrApply();if(typeof document!=="undefined"&&document.body&&document.body.classList)document.body.classList.remove("gate");S.legs.forEach(function(l,i){l._i=i;syncHours(l);syncTrip(l);pbAuto(l,i);fhApply(l)});var r=compute();TT_R=r;pbApply(r);var a=S.aircraft[S.ac]||S.aircraft[0],h="";
  h+='<h1>Fuel Tankering Optimizer</h1>'+(S.trip?'<p class="sub">'+esc(S.trip)+'</p>':'');
  h+='<h2>Aircraft</h2><div class="card"><div class="seg">'+S.aircraft.map(function(x,i){return '<button data-ac="'+i+'" class="'+(i==S.ac?"on":"")+'">'+esc(x.name.replace(/^(Gulfstream|Dassault) /,""))+'</button>'}).join("")+'</div>';
  h+='<p class="muted acline">'+fq(a.cap)+' max · '+gal(a.burn)+' gal/hr · '+(num(a.rate)*100).toFixed(1)+'%/hr carry penalty · <button class="lk" data-goto="ac">Edit</button></p>';
- h+='<label>Trip name <span class="lsub">optional, for the report</span></label><input data-p="trip" value="'+esc(S.trip)+'" placeholder="e.g. HOU–TEB–PBI"><label>Starting fuel on board (lb)</label>'+inp("startLb",S.startLb,"decimal","lb")+'<p class="muted">≈ '+gal(startGal())+' gal at '+dens()+' lb/gal</p></div>';
+ h+='<label>Trip name <span class="lsub">optional, for the report</span></label><input data-p="trip" value="'+esc(S.trip)+'" placeholder="e.g. HOU–TEB–PBI"><label>Starting fuel on board (lb)</label>'+inp("startLb",S.startLb,"decimal","lb")+'<p class="muted">≈ '+gal(startGal())+' gal at '+dens()+' lb/gal</p>'+lrNote()+'</div>';
  h+='<h2>Trip legs</h2><p class="muted">Hours and trip fuel fill in from the airports — type to override. <button class="lk" data-page="help">How it works</button></p>';
  S.legs.forEach(function(l,i){h+='<div class="card"><div class="hd"><b>Leg '+(i+1)+(l.hs?' '+hsBadge():'')+(isFix(l)?' '+fxBadge():'')+'</b>'+(S.legs.length>1?'<button class="btn del" data-del="'+i+'" aria-label="Remove leg">Remove</button>':'')+'</div>';
   h+='<div class="row3"><div><label class="nw">From <span class="lsub">ICAO or IATA</span></label>'+icaoInp("legs."+i+".from",l.fromT||l.from)+'<div class="hint" id="fh'+i+'">'+aptHint(l.fromT||l.from)+'</div></div><div><label class="nw">To <span class="lsub">ICAO or IATA</span></label>'+icaoInp("legs."+i+".to",l.toT||l.to)+'<div class="hint" id="toh'+i+'">'+aptHint(l.toT||l.to)+'</div></div><div><label>Wind % (+tail)</label>'+inp("legs."+i+".wind",l.wind,"decimal","0")+'<div class="hint" id="wh'+i+'">'+windHint(l)+'</div></div></div>';
@@ -1329,6 +1345,7 @@ function ghPoll(manual,cb){var g=ghCfg();if(!ghTok()){g.autoErr="Paste a GitHub 
   if(e){ghBack(g,e);cb&&cb(false);return}
   g.fail=0;g.nextAt=0;g.autoErr=null;g.polled=ghNow();if(meta&&meta.etag)g.etag=meta.etag;
   var mv=((d&&d.tree)||[]).filter(function(x){return x.path===FH_MINV_PATH})[0];if(mv&&mv.sha!==g.minSha){g.minSha=mv.sha;fhMinCheck(function(){render();save()})}
+  var lr=((d&&d.tree)||[]).filter(function(x){return x.path===LR_PATH})[0];if(lr&&lr.sha!==g.lrSha)ghFetch("contents/"+LR_PATH,"application/vnd.github.raw",function(e2,t2){if(e2||!t2)return;lrMerge(t2);g.lrSha=lr.sha;render();save()});
   var ch=[],seen={};((d&&d.tree)||[]).forEach(function(x){var m=x.type==="blob"&&String(x.path).match(/^([^\/.][^\/]*)\/latest\.(csv|xlsx)$/i);if(!m||seen[m[1]]||ghIgnored(m[1]))return;seen[m[1]]=1;var f=m[1],gv=g.v[f];
    if(!gv){gv=g.v[f]={on:true}}if(gv.on&&gv.sha!==x.sha)ch.push(f)});
   g.folders=Object.keys(seen).sort();
@@ -1362,7 +1379,7 @@ function ovWho(cb){var g=ghCfg();if(g.login){cb();return}ovReq("GET","https://ap
 var OV_RO="Your GitHub token can read but not write. To save FBO Handling entries, edit the token: Repository permissions › Contents › Read and write (repo adibiase/fuel-prices).";
 /* master import: diff against the current file, confirm → one commit */
 /* handling fee + waiver are per aircraft: aliases → canonical type; manual leg values are kept per aircraft and swapped on aircraft change */
-function ovAcNorm(s){var t=String(s||"").trim(),x=t.toLowerCase();if(!x)return"";if(/g650|glf6|^sj$|gulfstream/.test(x))return"G650ER";if(/f2th|fa2k|falcon|^hj$|2000\s*lxs|^2000$/.test(x))return"Falcon 2000LXS";if(/crj\s*-?\s*9|^cr9$|^crj$|cl-?600-?2d24/.test(x))return"CRJ900";return t}
+function ovAcNorm(s){var t=String(s||"").trim(),x=t.toLowerCase();if(!x)return"";var tl=lrTail(t);if(tl)return LR_TAILS[tl]==="Gulfstream G650ER"?"G650ER":"Falcon 2000LXS";if(/g650|glf6|^sj$|gulfstream/.test(x))return"G650ER";if(/f2th|fa2k|falcon|^hj$|2000\s*lxs|^2000$/.test(x))return"Falcon 2000LXS";if(/crj\s*-?\s*9|^cr9$|^crj$|cl-?600-?2d24/.test(x))return"CRJ900";return t}
 function acKey(){return ovAcNorm(acNow().name)||acNow().name}
 /* ---- FBO Handling page: shared per-aircraft handling fee + waiver gal per airport/FBO (private repo fbo-handling/latest.csv) ----
    PRIMARY source: value typed on a leg (written back here) › this table › blank + inline alert (overrides retired; Signature schedule = suggestion only) */
